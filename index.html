@@ -280,8 +280,10 @@ function phase(){
   if(!room || room.status !== "running" || !Number.isFinite(Number(room.startAt))) return "lobby";
   const nowMs = now();
   const startMs = Number(room.startAt);
-  if(startMs - nowMs > 0) return "count";
-  return nowMs - startMs < GAME_MS ? "game" : "final";
+  const remainingMs = startMs - nowMs;
+  if(remainingMs > 250) return "count";
+  if(nowMs - startMs < GAME_MS) return "game";
+  return "final";
 }
 const players=()=>Object.entries(room?.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.name);
 function show(id){document.querySelectorAll(".scr").forEach(s=>s.classList.toggle("on",s.id===id));}
@@ -387,7 +389,6 @@ function finishGame(){
   db.update(myPath(),{score:g.score,ok:g.ok,bad:g.bad,best:g.best,done:true});
   const n=Math.min(10,Math.max(0,g.score/TARGET_SCORE*10));
   $("fScore").textContent=g.score; $("fGrade").textContent=n.toFixed(1);
-  $("fMsg").textContent=n>=9?"¡Experto en memoria!":n>=6?"Aprobado":"A repasar segmentación";
   $("fStats").textContent=`Aciertos ${g.ok} · Errores ${g.bad} · Mejor combo ${g.best}`;
 }
 
@@ -433,7 +434,8 @@ function tick(){
     else if(!g.q) nextQ();
   }
   if(ph === "count") {
-    const left = Math.max(1, Math.min(3, Math.ceil((startAt - now()) / 1000)));
+    const remainingMs = Math.max(0, startAt - now());
+    const left = Math.max(1, Math.min(3, Math.ceil(remainingMs / 1000)));
     $("countNum").textContent = String(left);
   }
   if(ph === "game"){
