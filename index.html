@@ -103,7 +103,6 @@
     <p id="fStats" class="mono text-sm text-slate-300 mt-2"></p>
   </div>
   <div class="panel p-5 mt-4"><h3 class="text-xl font-bold mb-3 text-center">Tabla de posiciones</h3><div id="fBoard"></div></div>
-  <button id="btnReplay" class="btn w-full mt-4 py-4 text-xl font-bold rounded-md text-slate-900" style="background:var(--warn)">↻ Volver a jugar</button>
 </section>
 
 <!-- ADMIN -->
@@ -455,7 +454,6 @@ $("btnAdmin").onclick=()=>join(true);
 $("aBtn").onclick=adminAction;
 $("bOk").onclick=()=>answer(true);
 $("bBad").onclick=()=>answer(false);
-$("btnReplay").onclick=()=>{waiting=true;};
 addEventListener("keydown",e=>{
   if(curScr!=="game") return;
   if(e.key==="ArrowLeft"||e.key.toLowerCase()==="v") answer(true);
