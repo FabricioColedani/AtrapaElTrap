@@ -99,7 +99,7 @@
   <div class="panel p-5 text-center">
     <p class="text-slate-300">Tu puntaje final</p>
     <div id="fScore" class="mono font-bold text-6xl" style="color:var(--ok)">0</div>
-    <p class="mt-2 text-xl">Calificación: <b id="fGrade" class="mono text-amber-300"></b>/10 · <span id="fMsg"></span></p>
+    <p class="mt-2 text-xl">Calificación: <b id="fGrade" class="mono text-amber-300"></b>/10<span id="fMsg"></span></p>
     <p id="fStats" class="mono text-sm text-slate-300 mt-2"></p>
   </div>
   <div class="panel p-5 mt-4"><h3 class="text-xl font-bold mb-3 text-center">Tabla de posiciones</h3><div id="fBoard"></div></div>
@@ -133,6 +133,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const ADMIN_PIN = "g7admin";      // PIN del modo profesor
 const GAME_MS = 60000;         // Duración del juego
 const CARD_MS = 3000;          // Tiempo por tarjeta
+const COUNTDOWN_MS = 3000;      // Duración de la cuenta regresiva
 const TARGET_SCORE = 1500;     // Puntaje que equivale a nota 10
 
 /* ---------- 2) CAPA DE DATOS: Supabase ---------- */
@@ -280,9 +281,9 @@ function phase(){
   if(!room || room.status !== "running" || !Number.isFinite(Number(room.startAt))) return "lobby";
   const nowMs = now();
   const startMs = Number(room.startAt);
-  const remainingMs = startMs - nowMs;
-  if(remainingMs > 250) return "count";
-  if(nowMs - startMs < GAME_MS) return "game";
+  const elapsed = nowMs - startMs;
+  if(elapsed < 0) return "count";
+  if(elapsed < GAME_MS) return "game";
   return "final";
 }
 const players=()=>Object.entries(room?.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.name);
@@ -439,8 +440,9 @@ function tick(){
     $("countNum").textContent = String(left);
   }
   if(ph === "game"){
-    const left=Math.max(0,Math.ceil((GAME_MS-t)/1000));
-    $("gTime").textContent=left;
+    const elapsed = Math.max(0, now() - startAt);
+    const left = Math.max(0, Math.ceil((GAME_MS - elapsed) / 1000));
+    $("gTime").textContent = left;
     if(isAdmin) $("aStatus").textContent=`⏱ ${left}s`;
     else if(g){
       $("gScore").textContent=g.score; $("gCombo").textContent="x"+(1+Math.min(3,Math.floor(g.combo/3)));
@@ -465,7 +467,7 @@ function tick(){
 function adminAction(){
   const ph=phase();
   if(ph==="lobby") {
-    const startAt = now() + 3000;
+    const startAt = now() + COUNTDOWN_MS;
     room = { ...room, status: "running", startAt };
     db.update(`rooms/${code}`,{status:"running",startAt});
     renderRoom();
