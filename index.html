@@ -25,13 +25,6 @@
   .scr{display:none}.scr.on{display:block}
   @media (prefers-reduced-motion:reduce){.shake{animation:none}}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const supabase = window.supabase.createClient(
-    "https://wpdwxziglcartaabuhuz.supabase.co",
-    "sb_publishable_xONoEvqvaTNv32uXufF5-w_J4mfcM5s"
-  );
-</script>
 </head>
 <body>
 <main class="max-w-3xl mx-auto p-4">
@@ -47,8 +40,8 @@
   <div class="panel p-5 mt-6 space-y-4">
     <label class="block">Nombre y apellido o apodo<input id="name" maxlength="24" autocomplete="off" placeholder="Ada Lovelace"></label>
     <label class="block">Código de sala<input id="code" maxlength="12" autocomplete="off" placeholder="SALA1" class="mono uppercase"></label>
-    <button id="btnJoin" class="btn w-full py-4 text-xl font-bold rounded-md text-slate-900" style="background:var(--ok)">Unirme a la sala</button>
-    <button id="btnAdmin" class="w-full text-sm text-slate-400 underline">Soy el profesor</button>
+    <button id="btnJoin" class="btn w-full py-4 text-xl font-bold rounded-md text-slate-900" style="background:var(--ok)">→ Unirme a la sala</button>
+    <button id="btnAdmin" class="w-full text-sm text-slate-400 underline">⚑ Soy el Admin</button>
   </div>
 </section>
 
@@ -96,8 +89,8 @@
     <div id="qFb" class="mt-3 min-h-[7rem] text-sm"></div>
   </div>
   <div class="grid grid-cols-2 gap-3 mt-3">
-    <button id="bOk" class="btn rounded-md font-bold text-2xl text-slate-900" style="background:var(--ok);height:9rem">✅ Válido</button>
-    <button id="bBad" class="btn rounded-md font-bold text-2xl text-white" style="background:var(--bad);height:9rem">🚨 ¡TRAP!</button>
+    <button id="bOk" class="btn rounded-md font-bold text-2xl text-slate-900" style="background:var(--ok);height:9rem">✓ Válido</button>
+    <button id="bBad" class="btn rounded-md font-bold text-2xl text-white" style="background:var(--bad);height:9rem">⚠ ¡TRAP!</button>
   </div>
 </section>
 
@@ -110,7 +103,7 @@
     <p id="fStats" class="mono text-sm text-slate-300 mt-2"></p>
   </div>
   <div class="panel p-5 mt-4"><h3 class="text-xl font-bold mb-3 text-center">Tabla de posiciones</h3><div id="fBoard"></div></div>
-  <button id="btnReplay" class="btn w-full mt-4 py-4 text-xl font-bold rounded-md text-slate-900" style="background:var(--warn)">Volver a jugar</button>
+  <button id="btnReplay" class="btn w-full mt-4 py-4 text-xl font-bold rounded-md text-slate-900" style="background:var(--warn)">↻ Volver a jugar</button>
 </section>
 
 <!-- ADMIN -->
@@ -138,7 +131,7 @@ const SUPABASE_URL = "https://wpdwxziglcartaabuhuz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_xONoEvqvaTNv32uXufF5-w_J4mfcM5s";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const ADMIN_PIN = "1234";      // Cámbialo: PIN del modo profesor
+const ADMIN_PIN = "g7admin";      // PIN del modo profesor
 const GAME_MS = 60000;         // Duración del juego
 const CARD_MS = 3000;          // Tiempo por tarjeta
 const TARGET_SCORE = 1500;     // Puntaje que equivale a nota 10
@@ -216,10 +209,16 @@ const db = {
     const target = segments.slice(2);
 
     if (!target.length) {
-      Object.assign(next, value);
+      Object.assign(next, value || {});
     } else {
-      const existing = getAtPath(next, target) || {};
-      setAtPath(next, target, { ...existing, ...value });
+      let cursor = next;
+      for (let i = 0; i < target.length - 1; i++) {
+        const key = target[i];
+        cursor[key] = cursor[key] && typeof cursor[key] === "object" ? cursor[key] : {};
+        cursor = cursor[key];
+      }
+      const finalKey = target[target.length - 1];
+      cursor[finalKey] = { ...(cursor[finalKey] || {}), ...(value || {}) };
     }
 
     await saveRoomState(roomCode, next);
@@ -236,12 +235,22 @@ const db = {
     };
 
     emit();
+
+    let pollId = null;
+    const poll = () => {
+      emit();
+    };
+    pollId = setInterval(poll, 800);
+
     const unsub = subscribeRoom(roomCode, (nextState) => {
       const target = segments.slice(2);
       callback(target.length ? (getAtPath(nextState, target) ?? null) : nextState);
     });
 
-    return unsub;
+    return () => {
+      if (pollId) clearInterval(pollId);
+      unsub();
+    };
   },
   offline: () => {},
   onOffset: (callback) => callback(0)
@@ -291,11 +300,7 @@ function join(admin){
       adminInit=true;
       db.update(`rooms/${code}`,{status:"lobby"});
     }
-    if(room?.status === "running" && Number(room.startAt) > Date.now()){
-      waiting = !isAdmin;
-    } else {
-      waiting = false;
-    }
+    waiting = false;
     renderRoom();
   });
   if(!admin){
@@ -323,12 +328,13 @@ function makeQ(){
 }
 
 function startGame(){
+  if(isAdmin || !code) return;
   g={score:0,combo:0,best:0,ok:0,bad:0,locked:true};
   db.update(myPath(),{score:0,ok:0,bad:0,best:0,done:false});
   nextQ();
 }
 function nextQ(){
-  if(phase()!=="game") return;
+  if(isAdmin || !g || phase()!=="game") return;
   const q=g.q=makeQ(); g.qStart=Date.now(); g.locked=false;
   $("qSeg").textContent=q.seg; $("qBase").textContent=q.base; $("qLim").textContent=q.limit;
   $("qLabel").textContent=q.label; $("qAcc").textContent=q.acc; $("qFb").innerHTML="";
@@ -388,13 +394,20 @@ function tick(){
   const t = startAt ? now() - startAt : 0;
 
   if(ph === "lobby") waiting = false;
-  const scr = isAdmin ? "admin" : (waiting && ph !== "lobby") ? "lobby" : ph;
+  const scr = isAdmin ? "admin" : ph;
   if(scr !== curScr){ curScr = scr; show("s-" + scr); }
   if(ph !== curPhase){
     if(ph === "game" && !isAdmin && !waiting) startGame();
     if(curPhase === "game" && ph === "final" && !isAdmin) finishGame();
+    if(ph !== "game" && !isAdmin && g) {
+      g = null;
+    }
     curPhase = ph;
     renderRoom();
+  }
+  if(ph === "game" && !isAdmin) {
+    if(!g) startGame();
+    else if(!g.q) nextQ();
   }
   if(ph === "count") {
     const left = Math.max(1, Math.ceil((startAt - Date.now()) / 1000));
@@ -417,10 +430,10 @@ function tick(){
       const left = Math.max(1, Math.ceil((startAt - Date.now()) / 1000));
       $("aStatus").textContent = String(Math.min(3, left));
     }
-    if(ph === "final") $("aStatus").textContent="🏁 Terminó";
+    if(ph === "final") $("aStatus").textContent="■ Terminó";
     b.disabled = ph === "count" || ph === "game";
     b.style.opacity = b.disabled ? "0.4" : "1";
-    b.textContent = ph === "final" ? "🔄 Nueva ronda" : ph === "lobby" ? "🚀 Iniciar Juego para Todos" : "Juego en curso...";
+    b.textContent = ph === "final" ? "↻ Nueva ronda" : ph === "lobby" ? "▶ Iniciar Juego para Todos" : "Juego en curso...";
   }
 }
 /** Admin: iniciar (todos arrancan en startAt, hora del servidor) o preparar nueva ronda */

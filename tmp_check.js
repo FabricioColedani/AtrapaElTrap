@@ -1,17 +1,17 @@
-
+﻿
 /* ===========================================================
- * ¡Atrapa el Trap o Salva el Proceso!  —  Un solo archivo.
- * 1) CONFIGURACIÓN  2) CAPA DE DATOS (Supabase)
- * 3) ESTADO Y FASES 4) LÓGICA DEL JUEGO 5) INTERFAZ
+ * Â¡Atrapa el Trap o Salva el Proceso!  â€”  Un solo archivo.
+ * 1) CONFIGURACIÃ“N  2) CAPA DE DATOS (Supabase)
+ * 3) ESTADO Y FASES 4) LÃ“GICA DEL JUEGO 5) INTERFAZ
  * =========================================================== */
 
-/* ---------- 1) CONFIGURACIÓN: Supabase ---------- */
+/* ---------- 1) CONFIGURACIÃ“N: Supabase ---------- */
 const SUPABASE_URL = "https://wpdwxziglcartaabuhuz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_xONoEvqvaTNv32uXufF5-w_J4mfcM5s";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const ADMIN_PIN = "1234";      // Cámbialo: PIN del modo profesor
-const GAME_MS = 60000;         // Duración del juego
+const ADMIN_PIN = "1234";      // CÃ¡mbialo: PIN del modo profesor
+const GAME_MS = 60000;         // DuraciÃ³n del juego
 const CARD_MS = 3000;          // Tiempo por tarjeta
 const TARGET_SCORE = 1500;     // Puntaje que equivale a nota 10
 
@@ -88,10 +88,16 @@ const db = {
     const target = segments.slice(2);
 
     if (!target.length) {
-      Object.assign(next, value);
+      Object.assign(next, value || {});
     } else {
-      const existing = getAtPath(next, target) || {};
-      setAtPath(next, target, { ...existing, ...value });
+      let cursor = next;
+      for (let i = 0; i < target.length - 1; i++) {
+        const key = target[i];
+        cursor[key] = cursor[key] && typeof cursor[key] === "object" ? cursor[key] : {};
+        cursor = cursor[key];
+      }
+      const finalKey = target[target.length - 1];
+      cursor[finalKey] = { ...(cursor[finalKey] || {}), ...(value || {}) };
     }
 
     await saveRoomState(roomCode, next);
@@ -108,19 +114,29 @@ const db = {
     };
 
     emit();
+
+    let pollId = null;
+    const poll = () => {
+      emit();
+    };
+    pollId = setInterval(poll, 800);
+
     const unsub = subscribeRoom(roomCode, (nextState) => {
       const target = segments.slice(2);
       callback(target.length ? (getAtPath(nextState, target) ?? null) : nextState);
     });
 
-    return unsub;
+    return () => {
+      if (pollId) clearInterval(pollId);
+      unsub();
+    };
   },
   offline: () => {},
   onOffset: (callback) => callback(0)
 };
 
 if (!window.supabase) {
-  console.warn("Supabase no cargó correctamente. Revisa la conexión en la red.");
+  console.warn("Supabase no cargÃ³ correctamente. Revisa la conexiÃ³n en la red.");
 }
 
 /* ---------- 3) ESTADO Y FASES ---------- */
@@ -136,7 +152,7 @@ function clearRoomTicker(){
   if(roomTicker){ clearInterval(roomTicker); roomTicker=null; }
 }
 
-/** Fase derivada del reloj sincronizado: lobby → count → game → final */
+/** Fase derivada del reloj sincronizado: lobby â†’ count â†’ game â†’ final */
 function phase(){
   if(!room || room.status !== "running" || !Number.isFinite(Number(room.startAt))) return "lobby";
   const delta = Number(room.startAt) - Date.now();
@@ -177,21 +193,21 @@ function join(admin){
   if(!roomTicker) roomTicker = setInterval(tick,100);
 }
 
-/* ---------- 4) LÓGICA DEL JUEGO ---------- */
-/** Genera una tarjeta. Válido: 0 ≤ desplazamiento < Límite. Dirección física = Base + desplazamiento */
+/* ---------- 4) LÃ“GICA DEL JUEGO ---------- */
+/** Genera una tarjeta. VÃ¡lido: 0 â‰¤ desplazamiento < LÃ­mite. DirecciÃ³n fÃ­sica = Base + desplazamiento */
 function makeQ(){
   const base=rnd(1,40)*100, limit=rnd(2,20)*100, seg=rnd(0,5), valid=Math.random()<.5;
   if(Math.random()<.5){ // Tipo A: segmento + desplazamiento
     let off = valid ? rnd(0,limit-1) : (()=>{const r=Math.random();return r<.3?limit:r<.4?-rnd(1,99):rnd(limit+1,limit+400);})();
-    const why = valid ? `${off} < ${limit} → física ${base}+${off} = ${base+off} ✔`
-      : off<0 ? `Desplazamiento negativo (${off}) → TRAP` : `${off} ≥ ${limit} (el límite es exclusivo) → TRAP`;
+    const why = valid ? `${off} < ${limit} â†’ fÃ­sica ${base}+${off} = ${base+off} âœ”`
+      : off<0 ? `Desplazamiento negativo (${off}) â†’ TRAP` : `${off} â‰¥ ${limit} (el lÃ­mite es exclusivo) â†’ TRAP`;
     return {seg,base,limit,valid,label:"Desplazamiento:",acc:off,why,phys:base+off};
   }
-  // Tipo B: dirección física ya calculada
+  // Tipo B: direcciÃ³n fÃ­sica ya calculada
   const addr = valid ? base+rnd(0,limit-1) : [base+limit,base+limit+rnd(1,300),base-rnd(1,99)][rnd(0,2)];
-  const why = valid ? `${base} ≤ ${addr} < ${base+limit} ✔ dentro del segmento`
-    : `${addr} fuera de [${base}, ${base+limit-1}] → TRAP`;
-  return {seg,base,limit,valid,label:"Dirección física:",acc:addr,why,phys:addr};
+  const why = valid ? `${base} â‰¤ ${addr} < ${base+limit} âœ” dentro del segmento`
+    : `${addr} fuera de [${base}, ${base+limit-1}] â†’ TRAP`;
+  return {seg,base,limit,valid,label:"DirecciÃ³n fÃ­sica:",acc:addr,why,phys:addr};
 }
 
 function startGame(){
@@ -205,17 +221,17 @@ function nextQ(){
   $("qSeg").textContent=q.seg; $("qBase").textContent=q.base; $("qLim").textContent=q.limit;
   $("qLabel").textContent=q.label; $("qAcc").textContent=q.acc; $("qFb").innerHTML="";
 }
-function answer(choice){ // true = Válido, false = TRAP, null = tiempo agotado
+function answer(choice){ // true = VÃ¡lido, false = TRAP, null = tiempo agotado
   if(!g||g.locked||phase()!=="game") return;
   g.locked=true; const q=g.q, dt=Date.now()-g.qStart; let msg,color,good=false;
-  if(choice===null){g.bad++;g.combo=0;g.score-=50;msg="⏰ ¡Tiempo! −50";color="var(--warn)";}
+  if(choice===null){g.bad++;g.combo=0;g.score-=50;msg="â° Â¡Tiempo! âˆ’50";color="var(--warn)";}
   else if(choice===q.valid){
     g.ok++;g.combo++;g.best=Math.max(g.best,g.combo);
     const pts=(100+Math.round(50*(1-dt/CARD_MS)))*(1+Math.min(3,Math.floor(g.combo/3)));
-    g.score+=pts;msg=`¡Correcto! +${pts}`;color="var(--ok)";good=true;
-  } else {g.bad++;g.combo=0;g.score-=75;msg="❌ Error −75";color="var(--bad)";$("qCard").classList.add("shake");}
+    g.score+=pts;msg=`Â¡Correcto! +${pts}`;color="var(--ok)";good=true;
+  } else {g.bad++;g.combo=0;g.score-=75;msg="âŒ Error âˆ’75";color="var(--bad)";$("qCard").classList.add("shake");}
   g.score=Math.max(0,g.score);
-  // Mapa de memoria: muestra dónde cayó el acceso (0–7000)
+  // Mapa de memoria: muestra dÃ³nde cayÃ³ el acceso (0â€“7000)
   const pc=v=>Math.min(100,Math.max(0,v/70));
   $("qFb").innerHTML=`<div class="font-bold text-lg" style="color:${color}">${msg}</div><div class="mono">${q.why}</div>
     <div class="relative h-5 mt-2 rounded bg-slate-900 border border-slate-700">
@@ -230,21 +246,21 @@ function finishGame(){
   db.update(myPath(),{score:g.score,ok:g.ok,bad:g.bad,best:g.best,done:true});
   const n=Math.min(10,Math.max(0,g.score/TARGET_SCORE*10));
   $("fScore").textContent=g.score; $("fGrade").textContent=n.toFixed(1);
-  $("fMsg").textContent=n>=9?"¡Experto en memoria!":n>=6?"Aprobado":"A repasar segmentación";
-  $("fStats").textContent=`Aciertos ${g.ok} · Errores ${g.bad} · Mejor combo ${g.best}`;
+  $("fMsg").textContent=n>=9?"Â¡Experto en memoria!":n>=6?"Aprobado":"A repasar segmentaciÃ³n";
+  $("fStats").textContent=`Aciertos ${g.ok} Â· Errores ${g.bad} Â· Mejor combo ${g.best}`;
 }
 
 /* ---------- 5) INTERFAZ ---------- */
 function lb(list,podium){
-  const s=[...list].sort((a,b)=>(b.score||0)-(a.score||0)), medal=["🥇","🥈","🥉"], h=[110,80,60];
-  if(!s.length) return '<p class="text-center text-slate-400">Aún no hay alumnos conectados.</p>';
+  const s=[...list].sort((a,b)=>(b.score||0)-(a.score||0)), medal=["ðŸ¥‡","ðŸ¥ˆ","ðŸ¥‰"], h=[110,80,60];
+  if(!s.length) return '<p class="text-center text-slate-400">AÃºn no hay alumnos conectados.</p>';
   let out="";
   if(podium) out+='<div class="flex items-end justify-center gap-2 mb-4">'+[1,0,2].filter(i=>s[i]).map(i=>
     `<div class="text-center w-1/3 max-w-[9rem]"><div class="text-3xl">${medal[i]}</div><div class="truncate font-bold">${esc(s[i].name)}</div>
      <div class="mono font-bold pt-2 rounded-t" style="height:${h[i]}px;background:${["var(--warn)","#94a3b8","#c2763b"][i]};color:#0b1020">${s[i].score||0}</div></div>`).join("")+"</div>";
   return out+s.map((p,i)=>podium&&i<3?"":
     `<div class="flex justify-between py-2 px-3 border-b border-slate-700 ${p.id===me.id?"bg-slate-800 rounded":""}">
-      <span><span class="mono text-slate-400 mr-2">${i+1}°</span>${esc(p.name)}</span><b class="mono">${p.score||0}</b></div>`).join("");
+      <span><span class="mono text-slate-400 mr-2">${i+1}Â°</span>${esc(p.name)}</span><b class="mono">${p.score||0}</b></div>`).join("");
 }
 function renderRoom(){
   const ps=players(), on=ps.filter(p=>p.online!==false), ph=phase();
@@ -253,7 +269,7 @@ function renderRoom(){
   $("aBoard").innerHTML=lb(ph==="lobby"?on:ps,ph==="final");
   $("fBoard").innerHTML=lb(ps,true);
 }
-/** Bucle de 100 ms: decide qué pantalla mostrar según la fase sincronizada */
+/** Bucle de 100 ms: decide quÃ© pantalla mostrar segÃºn la fase sincronizada */
 function tick(){
   const ph=phase();
   const startAt = Number(room?.startAt || 0);
@@ -275,7 +291,7 @@ function tick(){
   if(ph === "game"){
     const left=Math.max(0,Math.ceil((GAME_MS-t)/1000));
     $("gTime").textContent=left;
-    if(isAdmin) $("aStatus").textContent=`⏱ ${left}s`;
+    if(isAdmin) $("aStatus").textContent=`â± ${left}s`;
     else if(g){
       $("gScore").textContent=g.score; $("gCombo").textContent="x"+(1+Math.min(3,Math.floor(g.combo/3)));
       const el=Date.now()-g.qStart;
@@ -289,10 +305,10 @@ function tick(){
       const left = Math.max(1, Math.ceil((startAt - Date.now()) / 1000));
       $("aStatus").textContent = String(Math.min(3, left));
     }
-    if(ph === "final") $("aStatus").textContent="🏁 Terminó";
+    if(ph === "final") $("aStatus").textContent="ðŸ TerminÃ³";
     b.disabled = ph === "count" || ph === "game";
     b.style.opacity = b.disabled ? "0.4" : "1";
-    b.textContent = ph === "final" ? "🔄 Nueva ronda" : ph === "lobby" ? "🚀 Iniciar Juego para Todos" : "Juego en curso...";
+    b.textContent = ph === "final" ? "ðŸ”„ Nueva ronda" : ph === "lobby" ? "ðŸš€ Iniciar Juego para Todos" : "Juego en curso...";
   }
 }
 /** Admin: iniciar (todos arrancan en startAt, hora del servidor) o preparar nueva ronda */
@@ -320,3 +336,4 @@ addEventListener("keydown",e=>{
   if(e.key==="ArrowLeft"||e.key.toLowerCase()==="v") answer(true);
   if(e.key==="ArrowRight"||e.key.toLowerCase()==="t") answer(false);
 });
+
