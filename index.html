@@ -462,7 +462,7 @@ function tick(){
 function adminAction(){
   const ph=phase();
   if(ph==="lobby") {
-    const startAt = Date.now() + 3500;
+    const startAt = Date.now() + 3000;
     db.update(`rooms/${code}`,{status:"running",startAt});
   } else if(ph==="final"){
     players().forEach(p=>db.update(`rooms/${code}/players/${p.id}`,{score:0,ok:0,bad:0,best:0,done:false}));
