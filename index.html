@@ -278,7 +278,7 @@ function clearRoomTicker(){
 /** Fase derivada del reloj sincronizado: lobby → count → game → final */
 function phase(){
   if(!room || room.status !== "running" || !Number.isFinite(Number(room.startAt))) return "lobby";
-  const nowMs = Date.now();
+  const nowMs = now();
   const startMs = Number(room.startAt);
   if(startMs - nowMs > 0) return "count";
   return nowMs - startMs < GAME_MS ? "game" : "final";
@@ -433,8 +433,8 @@ function tick(){
     else if(!g.q) nextQ();
   }
   if(ph === "count") {
-    const left = Math.max(1, Math.ceil((startAt - now()) / 1000));
-    $("countNum").textContent = String(Math.min(3, left));
+    const left = Math.max(1, Math.min(3, Math.ceil((startAt - now()) / 1000)));
+    $("countNum").textContent = String(left);
   }
   if(ph === "game"){
     const left=Math.max(0,Math.ceil((GAME_MS-t)/1000));
@@ -450,8 +450,8 @@ function tick(){
     const b=$("aBtn");
     $("aStatus").style.display=ph==="lobby"?"none":"block";
     if(ph === "count") {
-      const left = Math.max(1, Math.ceil((startAt - now()) / 1000));
-      $("aStatus").textContent = String(Math.min(3, left));
+      const left = Math.max(1, Math.min(3, Math.ceil((startAt - now()) / 1000)));
+      $("aStatus").textContent = String(left);
     }
     if(ph === "final") $("aStatus").textContent="■ Terminó";
     b.disabled = ph === "count" || ph === "game";
@@ -463,7 +463,7 @@ function tick(){
 function adminAction(){
   const ph=phase();
   if(ph==="lobby") {
-    const startAt = Date.now() + 3000;
+    const startAt = now() + 3000;
     room = { ...room, status: "running", startAt };
     db.update(`rooms/${code}`,{status:"running",startAt});
     renderRoom();
