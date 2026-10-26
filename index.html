@@ -256,15 +256,20 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const me={id:localStorage.pid||(localStorage.pid=Math.random().toString(36).slice(2,9)),name:""};
-let code="",isAdmin=false,room={},offset=0,g=null,waiting=false,curPhase="",curScr="",adminInit=false;
+let code="",isAdmin=false,room={},offset=0,g=null,waiting=false,curPhase="",curScr="",adminInit=false,roomTicker=null;
 const now=()=>Date.now()+offset;
 const myPath=()=>`rooms/${code}/players/${me.id}`;
 
+function clearRoomTicker(){
+  if(roomTicker){ clearInterval(roomTicker); roomTicker=null; }
+}
+
 /** Fase derivada del reloj sincronizado: lobby → count → game → final */
 function phase(){
-  if(room?.status!=="running") return "lobby";
-  const t=now()-room.startAt;
-  return t<0?"count":t<GAME_MS?"game":"final";
+  if(!room || room.status !== "running" || !Number.isFinite(Number(room.startAt))) return "lobby";
+  const delta = Number(room.startAt) - Date.now();
+  if(delta > 0) return "count";
+  return Date.now() - Number(room.startAt) < GAME_MS ? "game" : "final";
 }
 const players=()=>Object.entries(room?.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.name);
 function show(id){document.querySelectorAll(".scr").forEach(s=>s.classList.toggle("on",s.id===id));}
@@ -274,21 +279,30 @@ function join(admin){
   const name=$("name").value.trim();
   if(!admin&&!name) return $("name").focus();
   if(admin&&prompt("PIN de profesor:")!==ADMIN_PIN) return alert("PIN incorrecto");
+  clearRoomTicker();
+  room={}; g=null; waiting=false; curPhase=""; curScr=""; adminInit=false;
   me.name=name; isAdmin=admin; localStorage.nm=name;
   code=($("code").value.trim().toUpperCase()||"SALA1");
   $("lobbyCode").textContent=$("aCode").textContent=code;
   db.onOffset(o=>offset=o);
   db.listen(`rooms/${code}`,r=>{
     room=r||{};
-    if(isAdmin&&!room.status&&!adminInit){adminInit=true;db.update(`rooms/${code}`,{status:"lobby"});}
+    if(isAdmin && !room.status && !adminInit){
+      adminInit=true;
+      db.update(`rooms/${code}`,{status:"lobby"});
+    }
+    if(room?.status === "running" && Number(room.startAt) > Date.now()){
+      waiting = !isAdmin;
+    } else {
+      waiting = false;
+    }
     renderRoom();
   });
   if(!admin){
     db.update(myPath(),{name,online:true});
-    db.offline(myPath()+"/online",false);   // si cierra la pestaña, deja de contar como conectado
-    if(phase()!=="lobby") waiting=true;     // llegó tarde: espera la siguiente ronda
+    db.offline(myPath()+"/online",false);
   }
-  setInterval(tick,100);
+  if(!roomTicker) roomTicker = setInterval(tick,100);
 }
 
 /* ---------- 4) LÓGICA DEL JUEGO ---------- */
@@ -369,17 +383,24 @@ function renderRoom(){
 }
 /** Bucle de 100 ms: decide qué pantalla mostrar según la fase sincronizada */
 function tick(){
-  const ph=phase(), t=now()-(room.startAt||0);
-  if(ph==="lobby") waiting=false;
-  const scr=isAdmin?"admin":(waiting&&ph!=="lobby")?"lobby":ph;
-  if(scr!==curScr){curScr=scr;show("s-"+scr);}
-  if(ph!==curPhase){
-    if(ph==="game"&&!isAdmin&&!waiting) startGame();
-    if(curPhase==="game"&&ph==="final"&&!isAdmin) finishGame();
-    curPhase=ph; renderRoom();
+  const ph=phase();
+  const startAt = Number(room?.startAt || 0);
+  const t = startAt ? now() - startAt : 0;
+
+  if(ph === "lobby") waiting = false;
+  const scr = isAdmin ? "admin" : (waiting && ph !== "lobby") ? "lobby" : ph;
+  if(scr !== curScr){ curScr = scr; show("s-" + scr); }
+  if(ph !== curPhase){
+    if(ph === "game" && !isAdmin && !waiting) startGame();
+    if(curPhase === "game" && ph === "final" && !isAdmin) finishGame();
+    curPhase = ph;
+    renderRoom();
   }
-  if(ph==="count") $("countNum").textContent=Math.min(3,Math.ceil(-t/1000));
-  if(ph==="game"){
+  if(ph === "count") {
+    const left = Math.max(1, Math.ceil((startAt - Date.now()) / 1000));
+    $("countNum").textContent = String(Math.min(3, left));
+  }
+  if(ph === "game"){
     const left=Math.max(0,Math.ceil((GAME_MS-t)/1000));
     $("gTime").textContent=left;
     if(isAdmin) $("aStatus").textContent=`⏱ ${left}s`;
@@ -392,17 +413,23 @@ function tick(){
   if(isAdmin){
     const b=$("aBtn");
     $("aStatus").style.display=ph==="lobby"?"none":"block";
-    if(ph==="count") $("aStatus").textContent=Math.min(3,Math.ceil(-t/1000));
-    if(ph==="final") $("aStatus").textContent="🏁 Terminó";
-    b.disabled=ph==="count"||ph==="game"; b.style.opacity=b.disabled?.4:1;
-    b.textContent=ph==="final"?"🔄 Nueva ronda":ph==="lobby"?"🚀 Iniciar Juego para Todos":"Juego en curso...";
+    if(ph === "count") {
+      const left = Math.max(1, Math.ceil((startAt - Date.now()) / 1000));
+      $("aStatus").textContent = String(Math.min(3, left));
+    }
+    if(ph === "final") $("aStatus").textContent="🏁 Terminó";
+    b.disabled = ph === "count" || ph === "game";
+    b.style.opacity = b.disabled ? "0.4" : "1";
+    b.textContent = ph === "final" ? "🔄 Nueva ronda" : ph === "lobby" ? "🚀 Iniciar Juego para Todos" : "Juego en curso...";
   }
 }
 /** Admin: iniciar (todos arrancan en startAt, hora del servidor) o preparar nueva ronda */
 function adminAction(){
   const ph=phase();
-  if(ph==="lobby") db.update(`rooms/${code}`,{status:"running",startAt:now()+3500});
-  else if(ph==="final"){
+  if(ph==="lobby") {
+    const startAt = Date.now() + 3500;
+    db.update(`rooms/${code}`,{status:"running",startAt});
+  } else if(ph==="final"){
     players().forEach(p=>db.update(`rooms/${code}/players/${p.id}`,{score:0,ok:0,bad:0,best:0,done:false}));
     db.update(`rooms/${code}`,{status:"lobby"});
   }
