@@ -278,10 +278,10 @@ function clearRoomTicker(){
 /** Fase derivada del reloj sincronizado: lobby → count → game → final */
 function phase(){
   if(!room || room.status !== "running" || !Number.isFinite(Number(room.startAt))) return "lobby";
-  const nowMs = now();
-  const delta = Number(room.startAt) - nowMs;
-  if(delta > 0) return "count";
-  return nowMs - Number(room.startAt) < GAME_MS ? "game" : "final";
+  const nowMs = Date.now();
+  const startMs = Number(room.startAt);
+  if(startMs - nowMs > 0) return "count";
+  return nowMs - startMs < GAME_MS ? "game" : "final";
 }
 const players=()=>Object.entries(room?.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.name);
 function show(id){document.querySelectorAll(".scr").forEach(s=>s.classList.toggle("on",s.id===id));}
@@ -320,6 +320,7 @@ async function join(admin){
     }
     if(isAdmin && !room.status && !adminInit){
       adminInit=true;
+      room.status = "lobby";
       db.update(`rooms/${code}`,{status:"lobby"});
     }
     waiting = false;
@@ -463,10 +464,14 @@ function adminAction(){
   const ph=phase();
   if(ph==="lobby") {
     const startAt = Date.now() + 3000;
+    room = { ...room, status: "running", startAt };
     db.update(`rooms/${code}`,{status:"running",startAt});
+    renderRoom();
   } else if(ph==="final"){
     players().forEach(p=>db.update(`rooms/${code}/players/${p.id}`,{score:0,ok:0,bad:0,best:0,done:false}));
+    room = { ...room, status: "lobby" };
     db.update(`rooms/${code}`,{status:"lobby"});
+    renderRoom();
   }
 }
 
