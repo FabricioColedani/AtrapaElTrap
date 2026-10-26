@@ -159,12 +159,15 @@ function setAtPath(obj, segments, value) {
 async function loadRoomState(roomCode) {
   const { data, error } = await supabase
     .from("rooms")
-    .select("state")
+    .select("state, updated_at")
     .eq("code", roomCode)
     .maybeSingle();
 
   if (error) throw error;
-  return data ? (data.state || {}) : {};
+  if (!data) return null;
+
+  const state = data.state || {};
+  return { ...state, __updated_at: data.updated_at || null };
 }
 
 async function saveRoomState(roomCode, nextState) {
@@ -275,26 +278,46 @@ function clearRoomTicker(){
 /** Fase derivada del reloj sincronizado: lobby → count → game → final */
 function phase(){
   if(!room || room.status !== "running" || !Number.isFinite(Number(room.startAt))) return "lobby";
-  const delta = Number(room.startAt) - Date.now();
+  const nowMs = now();
+  const delta = Number(room.startAt) - nowMs;
   if(delta > 0) return "count";
-  return Date.now() - Number(room.startAt) < GAME_MS ? "game" : "final";
+  return nowMs - Number(room.startAt) < GAME_MS ? "game" : "final";
 }
 const players=()=>Object.entries(room?.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.name);
 function show(id){document.querySelectorAll(".scr").forEach(s=>s.classList.toggle("on",s.id===id));}
 
 /* ---------- Unirse ---------- */
-function join(admin){
+async function join(admin){
   const name=$("name").value.trim();
   if(!admin&&!name) return $("name").focus();
   if(admin&&prompt("PIN de profesor:")!==ADMIN_PIN) return alert("PIN incorrecto");
+
   clearRoomTicker();
   room={}; g=null; waiting=false; curPhase=""; curScr=""; adminInit=false;
   me.name=name; isAdmin=admin; localStorage.nm=name;
   code=($("code").value.trim().toUpperCase()||"SALA1");
   $("lobbyCode").textContent=$("aCode").textContent=code;
+
+  if (!admin) {
+    const existing = await loadRoomState(code);
+    if (!existing) {
+      alert("La sala no existe. Solo el administrador puede crearla.");
+      return;
+    }
+  } else if (!adminInit) {
+    const existing = await loadRoomState(code);
+    if (!existing) {
+      await saveRoomState(code, { status: "lobby", players: {} });
+    }
+  }
+
   db.onOffset(o=>offset=o);
   db.listen(`rooms/${code}`,r=>{
     room=r||{};
+    if (room.__updated_at) {
+      const ts = Date.parse(room.__updated_at);
+      if (Number.isFinite(ts)) offset = ts - Date.now();
+    }
     if(isAdmin && !room.status && !adminInit){
       adminInit=true;
       db.update(`rooms/${code}`,{status:"lobby"});
@@ -334,13 +357,13 @@ function startGame(){
 }
 function nextQ(){
   if(isAdmin || !g || phase()!=="game") return;
-  const q=g.q=makeQ(); g.qStart=Date.now(); g.locked=false;
+  const q=g.q=makeQ(); g.qStart=now(); g.locked=false;
   $("qSeg").textContent=q.seg; $("qBase").textContent=q.base; $("qLim").textContent=q.limit;
   $("qLabel").textContent=q.label; $("qAcc").textContent=q.acc; $("qFb").innerHTML="";
 }
 function answer(choice){ // true = Válido, false = TRAP, null = tiempo agotado
   if(!g||g.locked||phase()!=="game") return;
-  g.locked=true; const q=g.q, dt=Date.now()-g.qStart; let msg,color,good=false;
+  g.locked=true; const q=g.q, dt=now()-g.qStart; let msg,color,good=false;
   if(choice===null){g.bad++;g.combo=0;g.score-=50;msg="⏰ ¡Tiempo! −50";color="var(--warn)";}
   else if(choice===q.valid){
     g.ok++;g.combo++;g.best=Math.max(g.best,g.combo);
@@ -409,7 +432,7 @@ function tick(){
     else if(!g.q) nextQ();
   }
   if(ph === "count") {
-    const left = Math.max(1, Math.ceil((startAt - Date.now()) / 1000));
+    const left = Math.max(1, Math.ceil((startAt - now()) / 1000));
     $("countNum").textContent = String(Math.min(3, left));
   }
   if(ph === "game"){
@@ -418,7 +441,7 @@ function tick(){
     if(isAdmin) $("aStatus").textContent=`⏱ ${left}s`;
     else if(g){
       $("gScore").textContent=g.score; $("gCombo").textContent="x"+(1+Math.min(3,Math.floor(g.combo/3)));
-      const el=Date.now()-g.qStart;
+      const el=now()-g.qStart;
       if(!g.locked){$("gBar").style.width=Math.max(0,100-el/CARD_MS*100)+"%"; if(el>=CARD_MS) answer(null);}
     }
   }
@@ -426,7 +449,7 @@ function tick(){
     const b=$("aBtn");
     $("aStatus").style.display=ph==="lobby"?"none":"block";
     if(ph === "count") {
-      const left = Math.max(1, Math.ceil((startAt - Date.now()) / 1000));
+      const left = Math.max(1, Math.ceil((startAt - now()) / 1000));
       $("aStatus").textContent = String(Math.min(3, left));
     }
     if(ph === "final") $("aStatus").textContent="■ Terminó";
