@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>¡Atrapa el Trap o Salva el Proceso!</title>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{--ink:#0b1020;--panel:#131b36;--line:#2a3560;--ok:#34f5a1;--bad:#ff4d5e;--warn:#ffc83d;--txt:#e6ecff}
+  body{background:var(--ink);color:var(--txt);font-family:'Chakra Petch',system-ui,sans-serif;min-height:100dvh;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:40px 40px;background-position:-1px -1px}
+  body::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at 50% 0,transparent,var(--ink) 75%);pointer-events:none}
+  main{position:relative;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  .mono{font-family:'IBM Plex Mono',monospace}
+  .panel{background:var(--panel);border:2px solid var(--line);border-radius:6px}
+  .btn{transition:transform .08s;touch-action:manipulation}.btn:active{transform:scale(.95)}
+  input{background:var(--ink);border:2px solid var(--line);border-radius:6px;padding:.9rem 1rem;width:100%;font-size:1.1rem;color:var(--txt)}
+  input:focus,button:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
+  .shake{animation:sh .3s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  .scr{display:none}.scr.on{display:block}
+  @media (prefers-reduced-motion:reduce){.shake{animation:none}}
+</style>
+</head>
+<body>
+<main class="max-w-3xl mx-auto p-4">
+
+<div id="demoBanner" class="hidden mb-3 panel p-2 text-sm text-center text-amber-300">
+  Modo DEMO local: configura Firebase para jugar entre dispositivos. Puedes probar abriendo varias pestañas.
+</div>
+
+<!-- 1. INICIO -->
+<section id="s-join" class="scr on pt-8">
+  <h1 class="text-4xl sm:text-5xl font-bold leading-tight">¡Atrapa el Trap<br>o Salva el Proceso!</h1>
+  <p class="mt-2 text-slate-300">Segmentación de memoria · Sistemas Operativos</p>
+  <div class="panel p-5 mt-6 space-y-4">
+    <label class="block">Nombre y apellido o apodo<input id="name" maxlength="24" autocomplete="off" placeholder="Ada Lovelace"></label>
+    <label class="block">Código de sala<input id="code" maxlength="12" autocomplete="off" placeholder="SALA1" class="mono uppercase"></label>
+    <button id="btnJoin" class="btn w-full py-4 text-xl font-bold rounded-md text-slate-900" style="background:var(--ok)">Unirme a la sala</button>
+    <button id="btnAdmin" class="w-full text-sm text-slate-400 underline">Soy el profesor</button>
+  </div>
+</section>
+
+<!-- 2. LOBBY -->
+<section id="s-lobby" class="scr pt-4">
+  <div class="panel p-5 text-center">
+    <div class="text-slate-300">Sala <b id="lobbyCode" class="mono text-amber-300"></b></div>
+    <h2 class="text-2xl font-bold mt-1">Esperando a que el profesor inicie el juego...</h2>
+    <p class="mt-1"><b id="lobbyCount" class="mono text-3xl" style="color:var(--ok)">0</b> compañeros conectados</p>
+    <div id="lobbyList" class="mt-3 flex flex-wrap justify-center gap-2"></div>
+  </div>
+  <div class="panel p-5 mt-4">
+    <h3 class="text-xl font-bold mb-2">¿Cómo se juega?</h3>
+    <ol class="space-y-2 text-slate-200 list-decimal pl-5">
+      <li>Aparece una tarjeta de segmento con su <b>Base</b> y su <b>Límite</b>.</li>
+      <li>Tienes <b>3 segundos</b> para decidir si el acceso es <b style="color:var(--ok)">Válido</b> o un <b style="color:var(--bad)">TRAP</b> (violación de memoria).</li>
+      <li>Un acceso es válido si el desplazamiento está entre 0 y Límite−1. Dirección física = Base + desplazamiento.</li>
+      <li>Aciertos suman puntos, más rápido da bono y 3 seguidos activan <b>combos</b> (x2, x3, x4). Errores y tiempo agotado restan.</li>
+    </ol>
+    <p class="mt-3 text-sm text-slate-400">Teclado: ← o V = Válido · → o T = TRAP</p>
+  </div>
+</section>
+
+<!-- CUENTA REGRESIVA -->
+<section id="s-count" class="scr pt-24 text-center">
+  <p class="text-2xl text-slate-300">Prepárate</p>
+  <div id="countNum" class="mono font-bold" style="font-size:12rem;line-height:1;color:var(--warn)">3</div>
+</section>
+
+<!-- 3. JUEGO -->
+<section id="s-game" class="scr pt-2">
+  <div class="flex justify-between items-end mono">
+    <div><div class="text-xs text-slate-400">Puntos</div><div id="gScore" class="text-3xl font-bold" style="color:var(--ok)">0</div></div>
+    <div class="text-center"><div class="text-xs text-slate-400">Combo</div><div id="gCombo" class="text-3xl font-bold text-amber-300">x1</div></div>
+    <div class="text-right"><div class="text-xs text-slate-400">Segundos</div><div id="gTime" class="text-3xl font-bold">60</div></div>
+  </div>
+  <div class="h-2 mt-3 rounded bg-slate-800 overflow-hidden"><div id="gBar" class="h-full" style="background:var(--warn);width:100%;transition:width .1s linear"></div></div>
+  <div id="qCard" class="panel p-5 mt-3">
+    <div class="text-xl text-slate-300">Segmento <b id="qSeg" class="mono text-white"></b></div>
+    <div class="grid grid-cols-2 gap-3 mt-3 mono">
+      <div class="rounded p-3 bg-slate-900 border border-slate-700"><div class="text-xs text-slate-400">Base</div><div id="qBase" class="text-3xl font-bold"></div></div>
+      <div class="rounded p-3 bg-slate-900 border border-slate-700"><div class="text-xs text-slate-400">Límite</div><div id="qLim" class="text-3xl font-bold"></div></div>
+    </div>
+    <div class="mt-4 text-lg"><span id="qLabel" class="text-slate-300"></span> <b id="qAcc" class="mono text-3xl text-amber-300"></b></div>
+    <div id="qFb" class="mt-3 min-h-[7rem] text-sm"></div>
+  </div>
+  <div class="grid grid-cols-2 gap-3 mt-3">
+    <button id="bOk" class="btn rounded-md font-bold text-2xl text-slate-900" style="background:var(--ok);height:9rem">✅ Válido</button>
+    <button id="bBad" class="btn rounded-md font-bold text-2xl text-white" style="background:var(--bad);height:9rem">🚨 ¡TRAP!</button>
+  </div>
+</section>
+
+<!-- 4. FINAL -->
+<section id="s-final" class="scr pt-4">
+  <div class="panel p-5 text-center">
+    <p class="text-slate-300">Tu puntaje final</p>
+    <div id="fScore" class="mono font-bold text-6xl" style="color:var(--ok)">0</div>
+    <p class="mt-2 text-xl">Calificación: <b id="fGrade" class="mono text-amber-300"></b>/10 · <span id="fMsg"></span></p>
+    <p id="fStats" class="mono text-sm text-slate-300 mt-2"></p>
+  </div>
+  <div class="panel p-5 mt-4"><h3 class="text-xl font-bold mb-3 text-center">Tabla de posiciones</h3><div id="fBoard"></div></div>
+  <button id="btnReplay" class="btn w-full mt-4 py-4 text-xl font-bold rounded-md text-slate-900" style="background:var(--warn)">Volver a jugar</button>
+</section>
+
+<!-- ADMIN -->
+<section id="s-admin" class="scr pt-4">
+  <div class="panel p-5 text-center">
+    <div class="text-slate-300">Sala <b id="aCode" class="mono text-4xl text-amber-300"></b> · comparte este código</div>
+    <p class="mt-1"><b id="aCount" class="mono text-4xl" style="color:var(--ok)">0</b> alumnos conectados</p>
+    <div id="aStatus" class="mono text-5xl font-bold my-3"></div>
+    <button id="aBtn" class="btn w-full py-5 text-2xl font-bold rounded-md text-slate-900" style="background:var(--ok)"></button>
+  </div>
+  <div class="panel p-5 mt-4"><div id="aBoard"></div></div>
+</section>
+
+</main>
+
+<script type="module">
+/* ===========================================================
+ * ¡Atrapa el Trap o Salva el Proceso!  —  Un solo archivo.
+ * 1) CONFIGURACIÓN  2) CAPA DE DATOS (Firebase o demo local)
+ * 3) ESTADO Y FASES 4) LÓGICA DEL JUEGO 5) INTERFAZ
+ * =========================================================== */
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getDatabase,ref,set,update,remove,onValue,onDisconnect} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+/* ---------- 1) CONFIGURACIÓN: pega aquí los datos de tu proyecto Firebase ---------- */
+const FIREBASE_CONFIG = {
+  apiKey: "TU_API_KEY",
+  databaseURL: "https://TU_PROYECTO-default-rtdb.firebaseio.com",
+  projectId: "TU_PROYECTO"
+};
+const ADMIN_PIN = "1234";      // Cámbialo: PIN del modo profesor
+const GAME_MS = 60000;         // Duración del juego
+const CARD_MS = 3000;          // Tiempo por tarjeta
+const TARGET_SCORE = 1500;     // Puntaje que equivale a nota 10
+
+/* ---------- 2) CAPA DE DATOS ---------- */
+const demo = FIREBASE_CONFIG.apiKey.startsWith("TU_");
+let db;
+if (!demo) {
+  const fdb = getDatabase(initializeApp(FIREBASE_CONFIG));
+  db = {
+    update:(p,v)=>update(ref(fdb,p),v),
+    listen:(p,cb)=>onValue(ref(fdb,p),s=>cb(s.val())),
+    offline:(p,v)=>onDisconnect(ref(fdb,p)).set(v),
+    onOffset:cb=>onValue(ref(fdb,".info/serverTimeOffset"),s=>cb(s.val()||0)) // reloj del servidor
+  };
+} else {
+  // Demo local: localStorage + BroadcastChannel (sincroniza pestañas del mismo navegador)
+  const K="trap-demo", bc=new BroadcastChannel(K), subs=new Set();
+  const load=()=>JSON.parse(localStorage.getItem(K)||"{}");
+  const fire=()=>subs.forEach(f=>f());
+  bc.onmessage=fire;
+  db = {
+    update:(p,v)=>{const t=load();let o=t;p.split("/").forEach(k=>o=o[k]??={});Object.assign(o,v);
+      localStorage.setItem(K,JSON.stringify(t));bc.postMessage(1);fire();},
+    listen:(p,cb)=>{const f=()=>cb(p.split("/").reduce((o,k)=>o?.[k],load())??null);subs.add(f);f();},
+    offline:()=>{}, onOffset:cb=>cb(0)
+  };
+  document.getElementById("demoBanner").classList.remove("hidden");
+}
+
+/* ---------- 3) ESTADO Y FASES ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const me={id:localStorage.pid||(localStorage.pid=Math.random().toString(36).slice(2,9)),name:""};
+let code="",isAdmin=false,room={},offset=0,g=null,waiting=false,curPhase="",curScr="",adminInit=false;
+const now=()=>Date.now()+offset;
+const myPath=()=>`rooms/${code}/players/${me.id}`;
+
+/** Fase derivada del reloj sincronizado: lobby → count → game → final */
+function phase(){
+  if(room?.status!=="running") return "lobby";
+  const t=now()-room.startAt;
+  return t<0?"count":t<GAME_MS?"game":"final";
+}
+const players=()=>Object.entries(room?.players||{}).map(([id,p])=>({id,...p})).filter(p=>p.name);
+function show(id){document.querySelectorAll(".scr").forEach(s=>s.classList.toggle("on",s.id===id));}
+
+/* ---------- Unirse ---------- */
+function join(admin){
+  const name=$("name").value.trim();
+  if(!admin&&!name) return $("name").focus();
+  if(admin&&prompt("PIN de profesor:")!==ADMIN_PIN) return alert("PIN incorrecto");
+  me.name=name; isAdmin=admin; localStorage.nm=name;
+  code=($("code").value.trim().toUpperCase()||"SALA1");
+  $("lobbyCode").textContent=$("aCode").textContent=code;
+  db.onOffset(o=>offset=o);
+  db.listen(`rooms/${code}`,r=>{
+    room=r||{};
+    if(isAdmin&&!room.status&&!adminInit){adminInit=true;db.update(`rooms/${code}`,{status:"lobby"});}
+    renderRoom();
+  });
+  if(!admin){
+    db.update(myPath(),{name,online:true});
+    db.offline(myPath()+"/online",false);   // si cierra la pestaña, deja de contar como conectado
+    if(phase()!=="lobby") waiting=true;     // llegó tarde: espera la siguiente ronda
+  }
+  setInterval(tick,100);
+}
+
+/* ---------- 4) LÓGICA DEL JUEGO ---------- */
+/** Genera una tarjeta. Válido: 0 ≤ desplazamiento < Límite. Dirección física = Base + desplazamiento */
+function makeQ(){
+  const base=rnd(1,40)*100, limit=rnd(2,20)*100, seg=rnd(0,5), valid=Math.random()<.5;
+  if(Math.random()<.5){ // Tipo A: segmento + desplazamiento
+    let off = valid ? rnd(0,limit-1) : (()=>{const r=Math.random();return r<.3?limit:r<.4?-rnd(1,99):rnd(limit+1,limit+400);})();
+    const why = valid ? `${off} < ${limit} → física ${base}+${off} = ${base+off} ✔`
+      : off<0 ? `Desplazamiento negativo (${off}) → TRAP` : `${off} ≥ ${limit} (el límite es exclusivo) → TRAP`;
+    return {seg,base,limit,valid,label:"Desplazamiento:",acc:off,why,phys:base+off};
+  }
+  // Tipo B: dirección física ya calculada
+  const addr = valid ? base+rnd(0,limit-1) : [base+limit,base+limit+rnd(1,300),base-rnd(1,99)][rnd(0,2)];
+  const why = valid ? `${base} ≤ ${addr} < ${base+limit} ✔ dentro del segmento`
+    : `${addr} fuera de [${base}, ${base+limit-1}] → TRAP`;
+  return {seg,base,limit,valid,label:"Dirección física:",acc:addr,why,phys:addr};
+}
+
+function startGame(){
+  g={score:0,combo:0,best:0,ok:0,bad:0,locked:true};
+  db.update(myPath(),{score:0,ok:0,bad:0,best:0,done:false});
+  nextQ();
+}
+function nextQ(){
+  if(phase()!=="game") return;
+  const q=g.q=makeQ(); g.qStart=Date.now(); g.locked=false;
+  $("qSeg").textContent=q.seg; $("qBase").textContent=q.base; $("qLim").textContent=q.limit;
+  $("qLabel").textContent=q.label; $("qAcc").textContent=q.acc; $("qFb").innerHTML="";
+}
+function answer(choice){ // true = Válido, false = TRAP, null = tiempo agotado
+  if(!g||g.locked||phase()!=="game") return;
+  g.locked=true; const q=g.q, dt=Date.now()-g.qStart; let msg,color,good=false;
+  if(choice===null){g.bad++;g.combo=0;g.score-=50;msg="⏰ ¡Tiempo! −50";color="var(--warn)";}
+  else if(choice===q.valid){
+    g.ok++;g.combo++;g.best=Math.max(g.best,g.combo);
+    const pts=(100+Math.round(50*(1-dt/CARD_MS)))*(1+Math.min(3,Math.floor(g.combo/3)));
+    g.score+=pts;msg=`¡Correcto! +${pts}`;color="var(--ok)";good=true;
+  } else {g.bad++;g.combo=0;g.score-=75;msg="❌ Error −75";color="var(--bad)";$("qCard").classList.add("shake");}
+  g.score=Math.max(0,g.score);
+  // Mapa de memoria: muestra dónde cayó el acceso (0–7000)
+  const pc=v=>Math.min(100,Math.max(0,v/70));
+  $("qFb").innerHTML=`<div class="font-bold text-lg" style="color:${color}">${msg}</div><div class="mono">${q.why}</div>
+    <div class="relative h-5 mt-2 rounded bg-slate-900 border border-slate-700">
+      <div class="absolute h-full" style="left:${pc(q.base)}%;width:${pc(q.limit)}%;background:var(--ok);opacity:.45"></div>
+      <div class="absolute -top-1 h-7 w-1" style="left:${pc(q.phys)}%;background:${q.valid?"#fff":"var(--bad)"}"></div></div>`;
+  setTimeout(()=>$("qCard").classList.remove("shake"),300);
+  db.update(myPath(),{score:g.score,ok:g.ok,bad:g.bad,best:g.best});
+  setTimeout(nextQ,good?600:1400);
+}
+function finishGame(){
+  if(!g) return; g.locked=true;
+  db.update(myPath(),{score:g.score,ok:g.ok,bad:g.bad,best:g.best,done:true});
+  const n=Math.min(10,Math.max(0,g.score/TARGET_SCORE*10));
+  $("fScore").textContent=g.score; $("fGrade").textContent=n.toFixed(1);
+  $("fMsg").textContent=n>=9?"¡Experto en memoria!":n>=6?"Aprobado":"A repasar segmentación";
+  $("fStats").textContent=`Aciertos ${g.ok} · Errores ${g.bad} · Mejor combo ${g.best}`;
+}
+
+/* ---------- 5) INTERFAZ ---------- */
+function lb(list,podium){
+  const s=[...list].sort((a,b)=>(b.score||0)-(a.score||0)), medal=["🥇","🥈","🥉"], h=[110,80,60];
+  if(!s.length) return '<p class="text-center text-slate-400">Aún no hay alumnos conectados.</p>';
+  let out="";
+  if(podium) out+='<div class="flex items-end justify-center gap-2 mb-4">'+[1,0,2].filter(i=>s[i]).map(i=>
+    `<div class="text-center w-1/3 max-w-[9rem]"><div class="text-3xl">${medal[i]}</div><div class="truncate font-bold">${esc(s[i].name)}</div>
+     <div class="mono font-bold pt-2 rounded-t" style="height:${h[i]}px;background:${["var(--warn)","#94a3b8","#c2763b"][i]};color:#0b1020">${s[i].score||0}</div></div>`).join("")+"</div>";
+  return out+s.map((p,i)=>podium&&i<3?"":
+    `<div class="flex justify-between py-2 px-3 border-b border-slate-700 ${p.id===me.id?"bg-slate-800 rounded":""}">
+      <span><span class="mono text-slate-400 mr-2">${i+1}°</span>${esc(p.name)}</span><b class="mono">${p.score||0}</b></div>`).join("");
+}
+function renderRoom(){
+  const ps=players(), on=ps.filter(p=>p.online!==false), ph=phase();
+  $("lobbyCount").textContent=$("aCount").textContent=on.length;
+  $("lobbyList").innerHTML=on.map(p=>`<span class="px-3 py-1 rounded-full border border-slate-500 ${p.id===me.id?"ring-2 ring-amber-300":""}">${esc(p.name)}</span>`).join("");
+  $("aBoard").innerHTML=lb(ph==="lobby"?on:ps,ph==="final");
+  $("fBoard").innerHTML=lb(ps,true);
+}
+/** Bucle de 100 ms: decide qué pantalla mostrar según la fase sincronizada */
+function tick(){
+  const ph=phase(), t=now()-(room.startAt||0);
+  if(ph==="lobby") waiting=false;
+  const scr=isAdmin?"admin":(waiting&&ph!=="lobby")?"lobby":ph;
+  if(scr!==curScr){curScr=scr;show("s-"+scr);}
+  if(ph!==curPhase){
+    if(ph==="game"&&!isAdmin&&!waiting) startGame();
+    if(curPhase==="game"&&ph==="final"&&!isAdmin) finishGame();
+    curPhase=ph; renderRoom();
+  }
+  if(ph==="count") $("countNum").textContent=Math.min(3,Math.ceil(-t/1000));
+  if(ph==="game"){
+    const left=Math.max(0,Math.ceil((GAME_MS-t)/1000));
+    $("gTime").textContent=left;
+    if(isAdmin) $("aStatus").textContent=`⏱ ${left}s`;
+    else if(g){
+      $("gScore").textContent=g.score; $("gCombo").textContent="x"+(1+Math.min(3,Math.floor(g.combo/3)));
+      const el=Date.now()-g.qStart;
+      if(!g.locked){$("gBar").style.width=Math.max(0,100-el/CARD_MS*100)+"%"; if(el>=CARD_MS) answer(null);}
+    }
+  }
+  if(isAdmin){
+    const b=$("aBtn");
+    $("aStatus").style.display=ph==="lobby"?"none":"block";
+    if(ph==="count") $("aStatus").textContent=Math.min(3,Math.ceil(-t/1000));
+    if(ph==="final") $("aStatus").textContent="🏁 Terminó";
+    b.disabled=ph==="count"||ph==="game"; b.style.opacity=b.disabled?.4:1;
+    b.textContent=ph==="final"?"🔄 Nueva ronda":ph==="lobby"?"🚀 Iniciar Juego para Todos":"Juego en curso...";
+  }
+}
+/** Admin: iniciar (todos arrancan en startAt, hora del servidor) o preparar nueva ronda */
+function adminAction(){
+  const ph=phase();
+  if(ph==="lobby") db.update(`rooms/${code}`,{status:"running",startAt:now()+3500});
+  else if(ph==="final"){
+    players().forEach(p=>db.update(`rooms/${code}/players/${p.id}`,{score:0,ok:0,bad:0,best:0,done:false}));
+    db.update(`rooms/${code}`,{status:"lobby"});
+  }
+}
+
+/* Eventos */
+$("name").value=localStorage.nm||"";
+$("btnJoin").onclick=()=>join(false);
+$("btnAdmin").onclick=()=>join(true);
+$("aBtn").onclick=adminAction;
+$("bOk").onclick=()=>answer(true);
+$("bBad").onclick=()=>answer(false);
+$("btnReplay").onclick=()=>{waiting=true;};
+addEventListener("keydown",e=>{
+  if(curScr!=="game") return;
+  if(e.key==="ArrowLeft"||e.key.toLowerCase()==="v") answer(true);
+  if(e.key==="ArrowRight"||e.key.toLowerCase()==="t") answer(false);
+});
+</script>
+</body>
+</html>
