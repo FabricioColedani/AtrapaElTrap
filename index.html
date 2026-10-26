@@ -6,6 +6,7 @@
 <title>¡Atrapa el Trap o Salva el Proceso!</title>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{--ink:#0b1020;--panel:#131b36;--line:#2a3560;--ok:#34f5a1;--bad:#ff4d5e;--warn:#ffc83d;--txt:#e6ecff}
   body{background:var(--ink);color:var(--txt);font-family:'Chakra Petch',system-ui,sans-serif;min-height:100dvh;
@@ -22,6 +23,13 @@
   .scr{display:none}.scr.on{display:block}
   @media (prefers-reduced-motion:reduce){.shake{animation:none}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    "https://wpdwxziglcartaabuhuz.supabase.co",
+    "sb_publishable_xONoEvqvaTNv32uXufF5-w_J4mfcM5s"
+  );
+</script>
 </head>
 <body>
 <main class="max-w-3xl mx-auto p-4">
@@ -119,47 +127,126 @@
 <script type="module">
 /* ===========================================================
  * ¡Atrapa el Trap o Salva el Proceso!  —  Un solo archivo.
- * 1) CONFIGURACIÓN  2) CAPA DE DATOS (Firebase o demo local)
+ * 1) CONFIGURACIÓN  2) CAPA DE DATOS (Supabase)
  * 3) ESTADO Y FASES 4) LÓGICA DEL JUEGO 5) INTERFAZ
  * =========================================================== */
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getDatabase,ref,set,update,remove,onValue,onDisconnect} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-/* ---------- 1) CONFIGURACIÓN: pega aquí los datos de tu proyecto Firebase ---------- */
-const FIREBASE_CONFIG = {
-  apiKey: "TU_API_KEY",
-  databaseURL: "https://TU_PROYECTO-default-rtdb.firebaseio.com",
-  projectId: "TU_PROYECTO"
-};
+/* ---------- 1) CONFIGURACIÓN: Supabase ---------- */
+const SUPABASE_URL = "https://wpdwxziglcartaabuhuz.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_xONoEvqvaTNv32uXufF5-w_J4mfcM5s";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const ADMIN_PIN = "1234";      // Cámbialo: PIN del modo profesor
 const GAME_MS = 60000;         // Duración del juego
 const CARD_MS = 3000;          // Tiempo por tarjeta
 const TARGET_SCORE = 1500;     // Puntaje que equivale a nota 10
 
-/* ---------- 2) CAPA DE DATOS ---------- */
-const demo = FIREBASE_CONFIG.apiKey.startsWith("TU_");
-let db;
-if (!demo) {
-  const fdb = getDatabase(initializeApp(FIREBASE_CONFIG));
-  db = {
-    update:(p,v)=>update(ref(fdb,p),v),
-    listen:(p,cb)=>onValue(ref(fdb,p),s=>cb(s.val())),
-    offline:(p,v)=>onDisconnect(ref(fdb,p)).set(v),
-    onOffset:cb=>onValue(ref(fdb,".info/serverTimeOffset"),s=>cb(s.val()||0)) // reloj del servidor
-  };
-} else {
-  // Demo local: localStorage + BroadcastChannel (sincroniza pestañas del mismo navegador)
-  const K="trap-demo", bc=new BroadcastChannel(K), subs=new Set();
-  const load=()=>JSON.parse(localStorage.getItem(K)||"{}");
-  const fire=()=>subs.forEach(f=>f());
-  bc.onmessage=fire;
-  db = {
-    update:(p,v)=>{const t=load();let o=t;p.split("/").forEach(k=>o=o[k]??={});Object.assign(o,v);
-      localStorage.setItem(K,JSON.stringify(t));bc.postMessage(1);fire();},
-    listen:(p,cb)=>{const f=()=>cb(p.split("/").reduce((o,k)=>o?.[k],load())??null);subs.add(f);f();},
-    offline:()=>{}, onOffset:cb=>cb(0)
-  };
-  document.getElementById("demoBanner").classList.remove("hidden");
+/* ---------- 2) CAPA DE DATOS: Supabase ---------- */
+function pathToSegments(path) {
+  return String(path || "").split("/").filter(Boolean);
+}
+
+function getAtPath(obj, segments) {
+  return segments.reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj);
+}
+
+function setAtPath(obj, segments, value) {
+  if (!segments.length) return value;
+  const [head, ...rest] = segments;
+  if (!rest.length) {
+    obj[head] = value;
+    return obj;
+  }
+  obj[head] = obj[head] && typeof obj[head] === "object" ? obj[head] : {};
+  obj[head] = setAtPath(obj[head], rest, value);
+  return obj;
+}
+
+async function loadRoomState(roomCode) {
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("state")
+    .eq("code", roomCode)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? (data.state || {}) : {};
+}
+
+async function saveRoomState(roomCode, nextState) {
+  const { error } = await supabase.from("rooms").upsert({
+    code: roomCode,
+    state: nextState || {},
+    updated_at: new Date().toISOString()
+  }, { onConflict: "code" });
+
+  if (error) throw error;
+}
+
+function subscribeRoom(roomCode, callback) {
+  const channel = supabase
+    .channel(`room:${roomCode}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "rooms",
+        filter: `code=eq.${roomCode}`
+      },
+      (payload) => {
+        callback(payload.new?.state ?? {});
+      }
+    )
+    .subscribe();
+
+  return () => supabase.removeChannel(channel);
+}
+
+const db = {
+  async update(path, value) {
+    const segments = pathToSegments(path);
+    const roomCode = segments[1];
+    if (!roomCode) return;
+
+    const room = await loadRoomState(roomCode) || {};
+    const next = JSON.parse(JSON.stringify(room));
+    const target = segments.slice(2);
+
+    if (!target.length) {
+      Object.assign(next, value);
+    } else {
+      const existing = getAtPath(next, target) || {};
+      setAtPath(next, target, { ...existing, ...value });
+    }
+
+    await saveRoomState(roomCode, next);
+  },
+  listen(path, callback) {
+    const segments = pathToSegments(path);
+    const roomCode = segments[1];
+    if (!roomCode) return () => {};
+
+    const emit = async () => {
+      const room = await loadRoomState(roomCode) || {};
+      const target = segments.slice(2);
+      callback(target.length ? (getAtPath(room, target) ?? null) : room);
+    };
+
+    emit();
+    const unsub = subscribeRoom(roomCode, (nextState) => {
+      const target = segments.slice(2);
+      callback(target.length ? (getAtPath(nextState, target) ?? null) : nextState);
+    });
+
+    return unsub;
+  },
+  offline: () => {},
+  onOffset: (callback) => callback(0)
+};
+
+if (!window.supabase) {
+  console.warn("Supabase no cargó correctamente. Revisa la conexión en la red.");
 }
 
 /* ---------- 3) ESTADO Y FASES ---------- */
