@@ -196,7 +196,7 @@ h1,h2,h3{margin:0; font-family:'Chakra Petch',sans-serif}
     <label class="field">Nombre o apodo<input id="name" maxlength="24" autocomplete="off" placeholder="Ada Lovelace"></label>
     <label class="field">Código de sala<input id="code" maxlength="12" autocomplete="off" placeholder="SALA1" class="mono uppercase" style="text-transform:uppercase"></label>
     <button id="btnJoin" class="btn cta" style="margin-top:1.15rem">Unirme a la sala</button>
-    <button id="btnAdmin" class="btn linkish">Soy el profesor · abrir consola</button>
+    <button id="btnAdmin" class="btn linkish">Soy el Admin · abrir consola</button>
   </div>
 </section>
 
@@ -207,7 +207,7 @@ h1,h2,h3{margin:0; font-family:'Chakra Petch',sans-serif}
       <b id="lobbyCode" class="mono code-xl"></b>
       <button class="copy" type="button" id="copyLobby">Copiar</button>
     </div>
-    <h2 class="display" style="font-size:1.45rem;margin-top:.7rem">Esperando a que el profesor inicie el juego</h2>
+    <h2 class="display" style="font-size:1.45rem;margin-top:.7rem">Esperando a que el Admin inicie el juego</h2>
     <p class="sub" style="margin-top:.35rem"><b id="lobbyCount" class="mono" style="color:var(--ok);font-size:2rem">0</b> compañeros conectados</p>
     <div id="lobbyList" style="margin-top:1rem;display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem"></div>
   </div>
@@ -272,7 +272,7 @@ h1,h2,h3{margin:0; font-family:'Chakra Petch',sans-serif}
 
 <section id="s-admin" class="scr">
   <div class="panel glass" style="padding:1.3rem;text-align:center">
-    <p class="kicker" style="margin:0 auto">Consola del profesor</p>
+    <p class="kicker" style="margin:0 auto">Consola del Admin</p>
     <div style="display:flex;align-items:center;justify-content:center;gap:.6rem;margin-top:.85rem">
       <b id="aCode" class="mono code-xl"></b>
       <button class="copy" type="button" id="copyAdmin">Copiar</button>
@@ -289,9 +289,9 @@ h1,h2,h3{margin:0; font-family:'Chakra Petch',sans-serif}
 <div id="toast" class="toast" role="status"></div>
 <div id="modal" class="modal">
   <div class="panel glass" style="padding:1.35rem">
-    <p class="kicker">Acceso profesor</p>
+    <p class="kicker">Acceso Admin</p>
     <h3 class="display" style="font-size:1.5rem;margin-top:.7rem">Ingresá el PIN</h3>
-    <p class="sub">Solo quien dicta la clase puede crear e iniciar la sala.</p>
+    <p class="sub">Solo el Admin puede crear e iniciar la sala.</p>
     <label class="field" style="margin-top:1rem">PIN<input id="pin" type="password" autocomplete="off" placeholder="••••••"></label>
     <button id="pinOk" class="btn cta" style="margin-top:1rem">Entrar a la consola</button>
     <button id="pinCancel" class="btn linkish">Cancelar</button>
@@ -310,7 +310,7 @@ const SUPABASE_URL = "https://wpdwxziglcartaabuhuz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_xONoEvqvaTNv32uXufF5-w_J4mfcM5s";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const ADMIN_PIN = "g7admin";      // PIN del modo profesor
+const ADMIN_PIN = "g7admin";      // PIN del modo Admin
 const GAME_MS = 60000;         // Duración del juego
 const CARD_MS = 3000;          // Tiempo por tarjeta
 const COUNTDOWN_MS = 3000;      // Duración de la cuenta regresiva
@@ -542,7 +542,7 @@ async function join(admin){
   if (!admin) {
     const existing = await loadRoomState(code);
     if (!existing) {
-      toast("La sala no existe. Solo el profesor puede crearla.");
+      toast("La sala no existe. Solo el Admin puede crearla.");
       return;
     }
   } else if (!adminInit) {
