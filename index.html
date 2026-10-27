@@ -3,120 +3,300 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <title>¡Atrapa el Trap o Salva el Proceso!</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23080e1c'/%3E%3Crect x='10' y='38' width='20' height='14' rx='3' fill='%233dffb0'/%3E%3Crect x='34' y='22' width='20' height='30' rx='3' fill='%233ee6ff' opacity='.85'/%3E%3Crect x='22' y='12' width='12' height='12' rx='2' fill='%23ffcc4d'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@500;700&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root{--ink:#0b1020;--panel:#131b36;--line:#2a3560;--ok:#34f5a1;--bad:#ff4d5e;--warn:#ffc83d;--txt:#e6ecff}
-  body{background:var(--ink);color:var(--txt);font-family:'Chakra Petch',system-ui,sans-serif;min-height:100dvh;
-    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
-    background-size:40px 40px;background-position:-1px -1px}
-  body::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at 50% 0,transparent,var(--ink) 75%);pointer-events:none}
-  main{position:relative;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-  .mono{font-family:'IBM Plex Mono',monospace}
-  .panel{background:var(--panel);border:2px solid var(--line);border-radius:6px}
-  .btn{transition:transform .08s;touch-action:manipulation}.btn:active{transform:scale(.95)}
-  input{background:var(--ink);border:2px solid var(--line);border-radius:6px;padding:.9rem 1rem;width:100%;font-size:1.1rem;color:var(--txt)}
-  input:focus,button:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
-  .shake{animation:sh .3s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
-  .scr{display:none}.scr.on{display:block}
-  @media (prefers-reduced-motion:reduce){.shake{animation:none}}
+:root{
+  --ink:#070b16; --panel:rgba(14,22,44,.72); --line:rgba(130,170,255,.2);
+  --ok:#3dffb0; --bad:#ff4d73; --warn:#ffcc4d; --cyan:#3ee6ff; --vio:#8b7cff;
+  --txt:#eef3ff; --muted:#8fa0c7; --shadow:0 24px 80px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  margin:0; color:var(--txt); font-family:'Sora',system-ui,sans-serif;
+  background:var(--ink); overflow-x:hidden;
+  min-height:100dvh;
+}
+.fx,.fx::before,.fx::after{position:fixed;inset:0;pointer-events:none}
+.fx{
+  background:
+    radial-gradient(900px 420px at 12% -10%, rgba(62,230,255,.16), transparent 60%),
+    radial-gradient(700px 380px at 110% 8%, rgba(139,124,255,.18), transparent 55%),
+    radial-gradient(640px 420px at 50% 120%, rgba(61,255,176,.08), transparent 50%),
+    linear-gradient(#08101f, #070b16 40%, #0a1224);
+  z-index:0;
+}
+.fx::before{
+  content:"";
+  background-image:
+    linear-gradient(rgba(90,130,220,.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90,130,220,.09) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse at 50% 30%, #000 35%, transparent 80%);
+  animation:gridDrift 28s linear infinite;
+}
+.fx::after{
+  content:"";
+  background:linear-gradient(transparent 0%, rgba(255,255,255,.03) 50%, transparent 100%);
+  background-size:100% 4px; opacity:.25;
+}
+@keyframes gridDrift{to{background-position:48px 48px}}
+.orb{position:fixed;border-radius:50%;filter:blur(40px);opacity:.35;pointer-events:none;z-index:0}
+.orb.a{width:220px;height:220px;background:#3ee6ff;top:12%;left:-60px;animation:floaty 9s ease-in-out infinite}
+.orb.b{width:180px;height:180px;background:#8b7cff;right:-40px;bottom:18%;animation:floaty 11s ease-in-out infinite reverse}
+@keyframes floaty{50%{transform:translateY(-18px)}}
+main{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+.mono{font-family:'IBM Plex Mono',monospace}
+.display{font-family:'Chakra Petch',sans-serif}
+.kicker{
+  display:inline-flex;align-items:center;gap:.5rem;padding:.35rem .7rem;border-radius:999px;
+  border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--cyan);
+  font-size:.72rem; letter-spacing:.16em; text-transform:uppercase; font-weight:700;
+}
+.kicker i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);display:inline-block}
+.panel{
+  background:var(--panel); border:1px solid var(--line); border-radius:22px;
+  box-shadow:var(--shadow); backdrop-filter:blur(18px);
+}
+.glass{position:relative;overflow:hidden}
+.glass::before{
+  content:"";position:absolute;inset:0 0 auto;height:1px;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+}
+.btn{transition:transform .12s ease, filter .12s ease, box-shadow .12s ease; touch-action:manipulation; border:0; cursor:pointer; font-family:inherit}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{cursor:not-allowed}
+input{
+  background:rgba(7,11,22,.72); border:1px solid var(--line); border-radius:14px;
+  padding:.95rem 1rem; width:100%; font-size:1.05rem; color:var(--txt); font-family:inherit;
+}
+input:focus,button:focus-visible{outline:2px solid var(--warn); outline-offset:2px}
+label{display:block; color:var(--muted); font-size:.82rem; margin-bottom:.45rem}
+label + label, .field{margin-top:1rem}
+.scr{display:none}.scr.on{display:block;animation:rise .42s ease}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.shake{animation:sh .35s} @keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.deal{animation:deal .38s ease}
+@keyframes deal{from{opacity:.35;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.pop{animation:pop .28s cubic-bezier(.2,1.4,.3,1)}
+@keyframes pop{from{transform:scale(.55);filter:blur(6px);opacity:.3}to{transform:scale(1);filter:none;opacity:1}}
+.pulse{animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.04);text-shadow:0 0 24px currentColor}}
+h1,h2,h3{margin:0; font-family:'Chakra Petch',sans-serif}
+.hero-title{font-size:clamp(2.1rem,7vw,3.5rem); line-height:1.05; letter-spacing:-.03em}
+.sub{color:var(--muted); margin-top:.7rem; line-height:1.5}
+.cta{
+  width:100%; padding:1.05rem 1rem; border-radius:16px; font-size:1.15rem; font-weight:700;
+  background:linear-gradient(180deg,#62ffc4,#2ee39a); color:#062016;
+  box-shadow:0 10px 30px rgba(61,255,176,.25);
+}
+.cta:hover{filter:brightness(1.05)}
+.linkish{width:100%; background:none; color:var(--muted); text-decoration:none; padding:.85rem; font-size:.92rem}
+.linkish:hover{color:var(--txt)}
+.chip{
+  display:inline-flex; align-items:center; gap:.45rem; padding:.45rem .75rem; border-radius:999px;
+  border:1px solid var(--line); background:rgba(255,255,255,.04); font-size:.9rem;
+}
+.chip.me{border-color:rgba(255,204,77,.7); box-shadow:0 0 0 3px rgba(255,204,77,.12)}
+.avatar{
+  width:1.5rem; height:1.5rem; border-radius:50%; display:grid; place-items:center;
+  background:linear-gradient(135deg,var(--cyan),var(--vio)); color:#071018; font-size:.65rem; font-weight:800;
+}
+.stat{
+  background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:16px; padding:.85rem 1rem; min-width:0;
+}
+.stat b{display:block; font-size:1.7rem; line-height:1.1; margin-top:.15rem}
+.meter,.clock{height:8px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden}
+.meter > div,.clock > div{height:100%; width:100%; border-radius:inherit; transition:width .1s linear}
+.meter > div{background:linear-gradient(90deg,var(--warn),#ff8a3d)}
+.clock > div{background:linear-gradient(90deg,var(--cyan),var(--ok))}
+.seg-box{
+  border-radius:16px; padding:1rem; background:rgba(7,11,22,.55);
+  border:1px solid var(--line);
+}
+.seg-box .lbl{font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted)}
+.play-btn{
+  height:8.4rem; border-radius:22px; font-size:1.45rem; font-weight:800; letter-spacing:.02em;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.25rem;
+}
+.play-btn small{font-weight:600; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; opacity:.8}
+.ok-btn{background:linear-gradient(180deg,#62ffc4,#21c98a); color:#052016; box-shadow:0 12px 28px rgba(61,255,176,.2)}
+.bad-btn{background:linear-gradient(180deg,#ff7b96,#e4335c); color:#fff; box-shadow:0 12px 28px rgba(255,77,115,.22)}
+#s-game.locked .play-btn{filter:saturate(.7); opacity:.72}
+.count-wrap{min-height:70dvh; display:grid; place-items:center; text-align:center}
+.count-num{
+  font-size:clamp(7rem,28vw,12rem); line-height:1; color:var(--warn);
+  text-shadow:0 0 40px rgba(255,204,77,.45);
+}
+.danger{color:var(--bad)!important; animation:pulse .7s ease-in-out infinite}
+.hot{color:var(--warn); text-shadow:0 0 18px rgba(255,204,77,.45)}
+.fb-msg{font-size:1.15rem; font-weight:700; margin-bottom:.25rem}
+.mem{
+  position:relative; height:1.35rem; margin-top:.7rem; border-radius:8px;
+  background:#0a1020; border:1px solid var(--line); overflow:hidden;
+}
+.mem-seg{position:absolute; top:0; bottom:0; background:rgba(61,255,176,.38)}
+.mem-ptr{position:absolute; top:-4px; height:1.7rem; width:3px; border-radius:2px}
+.podium{display:flex; align-items:flex-end; justify-content:center; gap:.6rem; margin-bottom:1.1rem}
+.pod{
+  text-align:center; width:31%; max-width:9.5rem; padding:.6rem .4rem 0;
+  background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:16px 16px 8px 8px;
+}
+.pod .bar{margin-top:.45rem; border-radius:8px 8px 0 0; font-weight:800; color:#071018; display:flex; align-items:flex-end; justify-content:center; padding-bottom:.4rem}
+.row{
+  display:flex; justify-content:space-between; gap:1rem; align-items:center;
+  padding:.75rem .85rem; border-bottom:1px solid rgba(143,160,199,.12);
+}
+.row.me{background:rgba(62,230,255,.08); border-radius:12px; border:1px solid rgba(62,230,255,.2)}
+.code-xl{font-size:clamp(2rem,8vw,3.2rem); color:var(--warn); letter-spacing:.12em}
+.how li{margin:.55rem 0; color:#d5def6; line-height:1.45}
+.kbd{font-size:.78rem; color:var(--muted); background:rgba(255,255,255,.04); border:1px solid var(--line); padding:.55rem .8rem; border-radius:12px}
+.toast{
+  position:fixed; left:50%; bottom:1.4rem; transform:translateX(-50%) translateY(120%);
+  z-index:20; background:#121a33; border:1px solid var(--line); color:var(--txt);
+  padding:.8rem 1.1rem; border-radius:999px; box-shadow:var(--shadow); transition:transform .25s ease;
+  max-width:min(92vw,420px); text-align:center; font-size:.92rem;
+}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.modal{display:none; position:fixed; inset:0; z-index:30; place-items:center; background:rgba(4,8,16,.72); padding:1rem}
+.modal.on{display:grid}
+.modal .panel{width:min(100%,420px); padding:1.4rem}
+.copy{
+  border:1px solid var(--line); background:rgba(255,255,255,.05); color:var(--txt);
+  border-radius:12px; padding:.45rem .7rem; font-size:.8rem; font-weight:700; cursor:pointer;
+}
+#demoBanner{display:none}
+@media (max-width:640px){
+  .play-btn{height:7.2rem; font-size:1.2rem}
+  .stat b{font-size:1.4rem}
+}
+@media (prefers-reduced-motion:reduce){
+  .fx::before,.orb,.scr.on,.shake,.deal,.pop,.pulse,.danger{animation:none}
+}
 </style>
 </head>
 <body>
-<main class="max-w-3xl mx-auto p-4">
+<div class="fx"></div>
+<div class="orb a"></div>
+<div class="orb b"></div>
 
-<div id="demoBanner" class="hidden mb-3 panel p-2 text-sm text-center text-amber-300">
+<main>
+<div id="demoBanner" class="panel p-2 text-sm text-center" style="padding:.7rem 1rem;margin-bottom:1rem;color:var(--warn)">
   Modo DEMO local: configura Firebase para jugar entre dispositivos. Puedes probar abriendo varias pestañas.
 </div>
 
-<!-- 1. INICIO -->
-<section id="s-join" class="scr on pt-8">
-  <h1 class="text-4xl sm:text-5xl font-bold leading-tight">¡Atrapa el Trap<br>o Salva el Proceso!</h1>
-  <p class="mt-2 text-slate-300">Segmentación de memoria · Sistemas Operativos</p>
-  <div class="panel p-5 mt-6 space-y-4">
-    <label class="block">Nombre y apellido o apodo<input id="name" maxlength="24" autocomplete="off" placeholder="Ada Lovelace"></label>
-    <label class="block">Código de sala<input id="code" maxlength="12" autocomplete="off" placeholder="SALA1" class="mono uppercase"></label>
-    <button id="btnJoin" class="btn w-full py-4 text-xl font-bold rounded-md text-slate-900" style="background:var(--ok)">→ Unirme a la sala</button>
-    <button id="btnAdmin" class="w-full text-sm text-slate-400 underline">⚑ Soy el Admin</button>
+<section id="s-join" class="scr on">
+  <div class="kicker"><i></i> Laboratorio de memoria</div>
+  <h1 class="hero-title display mt-4" style="margin-top:1rem">¡Atrapa el Trap<br>o Salva el Proceso!</h1>
+  <p class="sub">Una carrera de 60 segundos para decidir si un acceso a memoria es válido o un <b style="color:var(--bad)">TRAP</b>. Segmentación · Sistemas Operativos.</p>
+  <div class="panel glass" style="padding:1.25rem;margin-top:1.5rem">
+    <label class="field">Nombre o apodo<input id="name" maxlength="24" autocomplete="off" placeholder="Ada Lovelace"></label>
+    <label class="field">Código de sala<input id="code" maxlength="12" autocomplete="off" placeholder="SALA1" class="mono uppercase" style="text-transform:uppercase"></label>
+    <button id="btnJoin" class="btn cta" style="margin-top:1.15rem">Unirme a la sala</button>
+    <button id="btnAdmin" class="btn linkish">Soy el profesor · abrir consola</button>
   </div>
 </section>
 
-<!-- 2. LOBBY -->
-<section id="s-lobby" class="scr pt-4">
-  <div class="panel p-5 text-center">
-    <div class="text-slate-300">Sala <b id="lobbyCode" class="mono text-amber-300"></b></div>
-    <h2 class="text-2xl font-bold mt-1">Esperando a que el profesor inicie el juego...</h2>
-    <p class="mt-1"><b id="lobbyCount" class="mono text-3xl" style="color:var(--ok)">0</b> compañeros conectados</p>
-    <div id="lobbyList" class="mt-3 flex flex-wrap justify-center gap-2"></div>
-  </div>
-  <div class="panel p-5 mt-4">
-    <h3 class="text-xl font-bold mb-2">¿Cómo se juega?</h3>
-    <ol class="space-y-2 text-slate-200 list-decimal pl-5">
-      <li>Aparece una tarjeta de segmento con su <b>Base</b> y su <b>Límite</b>.</li>
-      <li>Tienes <b>3 segundos</b> para decidir si el acceso es <b style="color:var(--ok)">Válido</b> o un <b style="color:var(--bad)">TRAP</b> (violación de memoria).</li>
-      <li>Un acceso es válido si el desplazamiento está entre 0 y Límite−1. Dirección física = Base + desplazamiento.</li>
-      <li>Aciertos suman puntos, más rápido da bono y 3 seguidos activan <b>combos</b> (x2, x3, x4). Errores y tiempo agotado restan.</li>
-    </ol>
-    <p class="mt-3 text-sm text-slate-400">Teclado: ← o V = Válido · → o T = TRAP</p>
-  </div>
-</section>
-
-<!-- CUENTA REGRESIVA -->
-<section id="s-count" class="scr pt-24 text-center">
-  <p class="text-2xl text-slate-300">Prepárate</p>
-  <div id="countNum" class="mono font-bold" style="font-size:12rem;line-height:1;color:var(--warn)">3</div>
-</section>
-
-<!-- 3. JUEGO -->
-<section id="s-game" class="scr pt-2">
-  <div class="flex justify-between items-end mono">
-    <div><div class="text-xs text-slate-400">Puntos</div><div id="gScore" class="text-3xl font-bold" style="color:var(--ok)">0</div></div>
-    <div class="text-center"><div class="text-xs text-slate-400">Combo</div><div id="gCombo" class="text-3xl font-bold text-amber-300">x1</div></div>
-    <div class="text-right"><div class="text-xs text-slate-400">Segundos</div><div id="gTime" class="text-3xl font-bold">60</div></div>
-  </div>
-  <div class="h-2 mt-3 rounded bg-slate-800 overflow-hidden"><div id="gBar" class="h-full" style="background:var(--warn);width:100%;transition:width .1s linear"></div></div>
-  <div id="qCard" class="panel p-5 mt-3">
-    <div class="text-xl text-slate-300">Segmento <b id="qSeg" class="mono text-white"></b></div>
-    <div class="grid grid-cols-2 gap-3 mt-3 mono">
-      <div class="rounded p-3 bg-slate-900 border border-slate-700"><div class="text-xs text-slate-400">Base</div><div id="qBase" class="text-3xl font-bold"></div></div>
-      <div class="rounded p-3 bg-slate-900 border border-slate-700"><div class="text-xs text-slate-400">Límite</div><div id="qLim" class="text-3xl font-bold"></div></div>
+<section id="s-lobby" class="scr">
+  <div class="panel glass" style="padding:1.3rem 1.2rem;text-align:center">
+    <div class="kicker" style="margin:0 auto">Sala en espera</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:.6rem;margin-top:.9rem">
+      <b id="lobbyCode" class="mono code-xl"></b>
+      <button class="copy" type="button" id="copyLobby">Copiar</button>
     </div>
-    <div class="mt-4 text-lg"><span id="qLabel" class="text-slate-300"></span> <b id="qAcc" class="mono text-3xl text-amber-300"></b></div>
-    <div id="qFb" class="mt-3 min-h-[7rem] text-sm"></div>
+    <h2 class="display" style="font-size:1.45rem;margin-top:.7rem">Esperando a que el profesor inicie el juego</h2>
+    <p class="sub" style="margin-top:.35rem"><b id="lobbyCount" class="mono" style="color:var(--ok);font-size:2rem">0</b> compañeros conectados</p>
+    <div id="lobbyList" style="margin-top:1rem;display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem"></div>
   </div>
-  <div class="grid grid-cols-2 gap-3 mt-3">
-    <button id="bOk" class="btn rounded-md font-bold text-2xl text-slate-900" style="background:var(--ok);height:9rem">✓ Válido</button>
-    <button id="bBad" class="btn rounded-md font-bold text-2xl text-white" style="background:var(--bad);height:9rem">⚠ ¡TRAP!</button>
+  <div class="panel" style="padding:1.25rem;margin-top:1rem">
+    <h3 class="display" style="font-size:1.25rem;margin-bottom:.4rem">¿Cómo se juega?</h3>
+    <ol class="how" style="padding-left:1.2rem">
+      <li>Aparece una tarjeta de segmento con su <b>Base</b> y su <b>Límite</b>.</li>
+      <li>Tienes <b>3 segundos</b> para decidir si el acceso es <b style="color:var(--ok)">Válido</b> o un <b style="color:var(--bad)">TRAP</b>.</li>
+      <li>Es válido si el desplazamiento está entre 0 y Límite−1. Dirección física = Base + desplazamiento.</li>
+      <li>Aciertos suman, la velocidad da bono y 3 seguidos activan <b>combos</b> (x2, x3, x4).</li>
+    </ol>
+    <p class="kbd" style="margin-top:.85rem">Teclado: ← o V = Válido · → o T = TRAP</p>
   </div>
 </section>
 
-<!-- 4. FINAL -->
-<section id="s-final" class="scr pt-4">
-  <div class="panel p-5 text-center">
-    <p class="text-slate-300">Tu puntaje final</p>
-    <div id="fScore" class="mono font-bold text-6xl" style="color:var(--ok)">0</div>
-    <p class="mt-2 text-xl">Calificación: <b id="fGrade" class="mono text-amber-300"></b>/10<span id="fMsg"></span></p>
-    <p id="fStats" class="mono text-sm text-slate-300 mt-2"></p>
+<section id="s-count" class="scr">
+  <div class="count-wrap">
+    <div>
+      <p class="kicker">Kernel listo</p>
+      <p class="sub" style="margin:.8rem 0 0">Prepárate</p>
+      <div id="countNum" class="mono display count-num">3</div>
+    </div>
   </div>
-  <div class="panel p-5 mt-4"><h3 class="text-xl font-bold mb-3 text-center">Tabla de posiciones</h3><div id="fBoard"></div></div>
 </section>
 
-<!-- ADMIN -->
-<section id="s-admin" class="scr pt-4">
-  <div class="panel p-5 text-center">
-    <div class="text-slate-300">Sala <b id="aCode" class="mono text-4xl text-amber-300"></b> · comparte este código</div>
-    <p class="mt-1"><b id="aCount" class="mono text-4xl" style="color:var(--ok)">0</b> alumnos conectados</p>
-    <div id="aStatus" class="mono text-5xl font-bold my-3"></div>
-    <button id="aBtn" class="btn w-full py-5 text-2xl font-bold rounded-md text-slate-900" style="background:var(--ok)"></button>
+<section id="s-game" class="scr">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem" class="mono">
+    <div class="stat"><div class="lbl" style="font-size:.7rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase">Puntos</div><b id="gScore" style="color:var(--ok)">0</b></div>
+    <div class="stat" style="text-align:center"><div style="font-size:.7rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase">Combo</div><b id="gCombo" class="hot">x1</b></div>
+    <div class="stat" style="text-align:right"><div style="font-size:.7rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase">Segundos</div><b id="gTime">60</b></div>
   </div>
-  <div class="panel p-5 mt-4"><div id="aBoard"></div></div>
+  <div class="clock" style="margin-top:.75rem"><div id="gClockBar"></div></div>
+  <div class="meter" style="margin-top:.45rem"><div id="gBar"></div></div>
+  <div id="qCard" class="panel glass" style="padding:1.15rem;margin-top:.85rem">
+    <div style="color:var(--muted)">Segmento <b id="qSeg" class="mono" style="color:#fff;font-size:1.35rem"></b></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-top:.8rem" class="mono">
+      <div class="seg-box"><div class="lbl">Base</div><div id="qBase" style="font-size:2rem;font-weight:800"></div></div>
+      <div class="seg-box"><div class="lbl">Límite</div><div id="qLim" style="font-size:2rem;font-weight:800"></div></div>
+    </div>
+    <div style="margin-top:1rem"><span id="qLabel" style="color:var(--muted)"></span> <b id="qAcc" class="mono" style="font-size:2rem;color:var(--warn)"></b></div>
+    <div id="qFb" style="margin-top:.85rem;min-height:6.6rem;font-size:.92rem"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-top:.8rem">
+    <button id="bOk" class="btn play-btn ok-btn"><span>✓ Válido</span><small>← / V</small></button>
+    <button id="bBad" class="btn play-btn bad-btn"><span>⚠ TRAP</span><small>→ / T</small></button>
+  </div>
 </section>
 
+<section id="s-final" class="scr">
+  <div class="panel glass" style="padding:1.4rem;text-align:center">
+    <p class="kicker">Proceso finalizado</p>
+    <p class="sub" style="margin-top:.8rem">Tu puntaje final</p>
+    <div id="fScore" class="mono display" style="font-size:clamp(3.4rem,12vw,5.5rem);font-weight:800;color:var(--ok);line-height:1;text-shadow:0 0 30px rgba(61,255,176,.35)">0</div>
+    <p style="margin-top:.7rem;font-size:1.15rem">Calificación: <b id="fGrade" class="mono" style="color:var(--warn)"></b>/10<span id="fMsg"></span></p>
+    <p id="fStats" class="mono" style="color:var(--muted);margin-top:.45rem"></p>
+  </div>
+  <div class="panel" style="padding:1.2rem;margin-top:1rem">
+    <h3 class="display" style="text-align:center;margin-bottom:.9rem">Tabla de posiciones</h3>
+    <div id="fBoard"></div>
+  </div>
+</section>
+
+<section id="s-admin" class="scr">
+  <div class="panel glass" style="padding:1.3rem;text-align:center">
+    <p class="kicker" style="margin:0 auto">Consola del profesor</p>
+    <div style="display:flex;align-items:center;justify-content:center;gap:.6rem;margin-top:.85rem">
+      <b id="aCode" class="mono code-xl"></b>
+      <button class="copy" type="button" id="copyAdmin">Copiar</button>
+    </div>
+    <p class="sub">Comparte este código con el curso</p>
+    <p style="margin:.4rem 0 0"><b id="aCount" class="mono" style="font-size:2.6rem;color:var(--ok)">0</b><br><span style="color:var(--muted)">alumnos conectados</span></p>
+    <div id="aStatus" class="mono display" style="font-size:2.6rem;font-weight:800;margin:1rem 0 .4rem"></div>
+    <button id="aBtn" class="btn cta"></button>
+  </div>
+  <div class="panel" style="padding:1.15rem;margin-top:1rem"><div id="aBoard"></div></div>
+</section>
 </main>
+
+<div id="toast" class="toast" role="status"></div>
+<div id="modal" class="modal">
+  <div class="panel glass" style="padding:1.35rem">
+    <p class="kicker">Acceso profesor</p>
+    <h3 class="display" style="font-size:1.5rem;margin-top:.7rem">Ingresá el PIN</h3>
+    <p class="sub">Solo quien dicta la clase puede crear e iniciar la sala.</p>
+    <label class="field" style="margin-top:1rem">PIN<input id="pin" type="password" autocomplete="off" placeholder="••••••"></label>
+    <button id="pinOk" class="btn cta" style="margin-top:1rem">Entrar a la consola</button>
+    <button id="pinCancel" class="btn linkish">Cancelar</button>
+  </div>
+</div>
 
 <script type="module">
 /* ===========================================================
@@ -273,9 +453,47 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const me={id:localStorage.pid||(localStorage.pid=Math.random().toString(36).slice(2,9)),name:""};
-let code="",isAdmin=false,room={},offset=0,lastRoomUpdatedAt=null,g=null,waiting=false,curPhase="",curScr="",adminInit=false,roomTicker=null;
+let code="",isAdmin=false,room={},offset=0,lastRoomUpdatedAt=null,g=null,waiting=false,curPhase="",curScr="",adminInit=false,roomTicker=null,lastCountShown="";
 const now=()=>Date.now()+offset;
 const myPath=()=>`rooms/${code}/players/${me.id}`;
+
+function toast(msg){
+  const el=$("toast");
+  el.textContent=msg;
+  el.classList.add("on");
+  clearTimeout(toast._t);
+  toast._t=setTimeout(()=>el.classList.remove("on"), 2800);
+}
+function initials(name){
+  const p=String(name||"").trim().split(/\s+/).filter(Boolean);
+  return ((p[0]?.[0]||"?")+(p[1]?.[0]||"")).toUpperCase();
+}
+function copyCode(){
+  if(!code) return;
+  navigator.clipboard?.writeText(code).then(()=>toast("Código copiado: "+code)).catch(()=>toast(code));
+}
+function askPin(){
+  return new Promise(resolve=>{
+    const modal=$("modal"), pin=$("pin");
+    modal.classList.add("on");
+    pin.value="";
+    setTimeout(()=>pin.focus(), 50);
+    const done=ok=>{
+      modal.classList.remove("on");
+      pin.onkeydown=$("pinOk").onclick=$("pinCancel").onclick=null;
+      resolve(ok);
+    };
+    $("pinOk").onclick=()=>done(pin.value===ADMIN_PIN);
+    $("pinCancel").onclick=()=>done(null);
+    pin.onkeydown=e=>{ if(e.key==="Enter") done(pin.value===ADMIN_PIN); if(e.key==="Escape") done(null); };
+  });
+}
+function bump(el, cls="pop"){
+  if(!el) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
 
 /** Offset de reloj: solo cuando updated_at cambia (write fresco ≈ hora del servidor). */
 function applyRoomClock(nextRoom){
@@ -308,11 +526,15 @@ function show(id){document.querySelectorAll(".scr").forEach(s=>s.classList.toggl
 async function join(admin){
   const name=$("name").value.trim();
   if(!admin&&!name) return $("name").focus();
-  if(admin&&prompt("PIN de profesor:")!==ADMIN_PIN) return alert("PIN incorrecto");
+  if(admin){
+    const pinOk=await askPin();
+    if(pinOk===null) return;
+    if(!pinOk){ toast("PIN incorrecto"); return; }
+  }
 
   clearRoomTicker();
   room={}; g=null; waiting=false; curPhase=""; curScr=""; adminInit=false;
-  offset=0; lastRoomUpdatedAt=null;
+  offset=0; lastRoomUpdatedAt=null; lastCountShown="";
   me.name=name; isAdmin=admin; localStorage.nm=name;
   code=($("code").value.trim().toUpperCase()||"SALA1");
   $("lobbyCode").textContent=$("aCode").textContent=code;
@@ -320,7 +542,7 @@ async function join(admin){
   if (!admin) {
     const existing = await loadRoomState(code);
     if (!existing) {
-      alert("La sala no existe. Solo el administrador puede crearla.");
+      toast("La sala no existe. Solo el profesor puede crearla.");
       return;
     }
   } else if (!adminInit) {
@@ -378,23 +600,23 @@ function nextQ(){
   const q=g.q=makeQ(); g.qStart=now(); g.locked=false;
   $("qSeg").textContent=q.seg; $("qBase").textContent=q.base; $("qLim").textContent=q.limit;
   $("qLabel").textContent=q.label; $("qAcc").textContent=q.acc; $("qFb").innerHTML="";
+  bump($("qCard"),"deal");
 }
 function answer(choice){ // true = Válido, false = TRAP, null = tiempo agotado
   if(!g||g.locked||phase()!=="game") return;
   g.locked=true; const q=g.q, dt=now()-g.qStart; let msg,color,good=false;
-  if(choice===null){g.bad++;g.combo=0;g.score-=50;msg="⏰ ¡Tiempo! −50";color="var(--warn)";}
+  if(choice===null){g.bad++;g.combo=0;g.score-=50;msg="Tiempo agotado −50";color="var(--warn)";}
   else if(choice===q.valid){
     g.ok++;g.combo++;g.best=Math.max(g.best,g.combo);
     const pts=(100+Math.round(50*(1-dt/CARD_MS)))*(1+Math.min(3,Math.floor(g.combo/3)));
     g.score+=pts;msg=`¡Correcto! +${pts}`;color="var(--ok)";good=true;
-  } else {g.bad++;g.combo=0;g.score-=75;msg="❌ Error −75";color="var(--bad)";$("qCard").classList.add("shake");}
+  } else {g.bad++;g.combo=0;g.score-=75;msg="Error −75";color="var(--bad)";$("qCard").classList.add("shake");}
   g.score=Math.max(0,g.score);
-  // Mapa de memoria: muestra dónde cayó el acceso (0–7000)
   const pc=v=>Math.min(100,Math.max(0,v/70));
-  $("qFb").innerHTML=`<div class="font-bold text-lg" style="color:${color}">${msg}</div><div class="mono">${q.why}</div>
-    <div class="relative h-5 mt-2 rounded bg-slate-900 border border-slate-700">
-      <div class="absolute h-full" style="left:${pc(q.base)}%;width:${pc(q.limit)}%;background:var(--ok);opacity:.45"></div>
-      <div class="absolute -top-1 h-7 w-1" style="left:${pc(q.phys)}%;background:${q.valid?"#fff":"var(--bad)"}"></div></div>`;
+  $("qFb").innerHTML=`<div class="fb-msg" style="color:${color}">${msg}</div><div class="mono" style="color:var(--muted)">${q.why}</div>
+    <div class="mem">
+      <div class="mem-seg" style="left:${pc(q.base)}%;width:${pc(q.limit)}%"></div>
+      <div class="mem-ptr" style="left:${pc(q.phys)}%;background:${q.valid?"#fff":"var(--bad)"}"></div></div>`;
   setTimeout(()=>$("qCard").classList.remove("shake"),300);
   db.update(myPath(),{score:g.score,ok:g.ok,bad:g.bad,best:g.best});
   setTimeout(nextQ,good?600:1400);
@@ -410,19 +632,21 @@ function finishGame(){
 /* ---------- 5) INTERFAZ ---------- */
 function lb(list,podium){
   const s=[...list].sort((a,b)=>(b.score||0)-(a.score||0)), medal=["🥇","🥈","🥉"], h=[110,80,60];
-  if(!s.length) return '<p class="text-center text-slate-400">Aún no hay alumnos conectados.</p>';
+  if(!s.length) return '<p style="text-align:center;color:var(--muted);margin:0">Aún no hay alumnos conectados.</p>';
   let out="";
-  if(podium) out+='<div class="flex items-end justify-center gap-2 mb-4">'+[1,0,2].filter(i=>s[i]).map(i=>
-    `<div class="text-center w-1/3 max-w-[9rem]"><div class="text-3xl">${medal[i]}</div><div class="truncate font-bold">${esc(s[i].name)}</div>
-     <div class="mono font-bold pt-2 rounded-t" style="height:${h[i]}px;background:${["var(--warn)","#94a3b8","#c2763b"][i]};color:#0b1020">${s[i].score||0}</div></div>`).join("")+"</div>";
+  if(podium) out+='<div class="podium">'+[1,0,2].filter(i=>s[i]).map(i=>
+    `<div class="pod"><div style="font-size:1.6rem">${medal[i]}</div><div class="truncate" style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s[i].name)}</div>
+     <div class="bar mono" style="height:${h[i]}px;background:${["var(--warn)","#94a3b8","#c2763b"][i]}">${s[i].score||0}</div></div>`).join("")+"</div>";
   return out+s.map((p,i)=>podium&&i<3?"":
-    `<div class="flex justify-between py-2 px-3 border-b border-slate-700 ${p.id===me.id?"bg-slate-800 rounded":""}">
-      <span><span class="mono text-slate-400 mr-2">${i+1}°</span>${esc(p.name)}</span><b class="mono">${p.score||0}</b></div>`).join("");
+    `<div class="row ${p.id===me.id?"me":""}">
+      <span><span class="mono" style="color:var(--muted);margin-right:.55rem">${i+1}°</span>${esc(p.name)}</span><b class="mono">${p.score||0}</b></div>`).join("");
 }
 function renderRoom(){
   const ps=players(), on=ps.filter(p=>p.online!==false), ph=phase();
   $("lobbyCount").textContent=$("aCount").textContent=on.length;
-  $("lobbyList").innerHTML=on.map(p=>`<span class="px-3 py-1 rounded-full border border-slate-500 ${p.id===me.id?"ring-2 ring-amber-300":""}">${esc(p.name)}</span>`).join("");
+  $("lobbyList").innerHTML=on.length
+    ? on.map(p=>`<span class="chip ${p.id===me.id?"me":""}"><span class="avatar">${esc(initials(p.name))}</span>${esc(p.name)}</span>`).join("")
+    : '<span style="color:var(--muted)">Nadie se conectó todavía.</span>';
   $("aBoard").innerHTML=lb(ph==="lobby"?on:ps,ph==="final");
   $("fBoard").innerHTML=lb(ps,true);
 }
@@ -430,7 +654,6 @@ function renderRoom(){
 function tick(){
   const ph=phase();
   const startAt = Number(room?.startAt || 0);
-  const t = startAt ? now() - startAt : 0;
 
   if(ph === "lobby") waiting = false;
   const scr = isAdmin ? "admin" : ph;
@@ -449,17 +672,32 @@ function tick(){
   if(ph === "count") {
     const remainingMs = Math.max(0, startAt - now());
     const left = Math.max(1, Math.min(3, Math.ceil(remainingMs / 1000)));
-    $("countNum").textContent = String(left);
+    const text = String(left);
+    if(text !== lastCountShown){
+      lastCountShown = text;
+      $("countNum").textContent = text;
+      bump($("countNum"));
+    }
+  } else {
+    lastCountShown = "";
   }
   if(ph === "game"){
     const elapsed = Math.max(0, now() - startAt);
     const left = Math.max(0, Math.ceil((GAME_MS - elapsed) / 1000));
     $("gTime").textContent = left;
-    if(isAdmin) $("aStatus").textContent=`⏱ ${left}s`;
+    $("gTime").classList.toggle("danger", left <= 10);
+    const clock=$("gClockBar");
+    if(clock) clock.style.width = Math.max(0, 100 - elapsed/GAME_MS*100) + "%";
+    if(isAdmin) $("aStatus").textContent=`${left}s`;
     else if(g){
-      $("gScore").textContent=g.score; $("gCombo").textContent="x"+(1+Math.min(3,Math.floor(g.combo/3)));
+      $("s-game").classList.toggle("locked", !!g.locked);
+      $("gScore").textContent=g.score;
+      const mult=1+Math.min(3,Math.floor(g.combo/3));
+      $("gCombo").textContent="x"+mult;
+      $("gCombo").classList.toggle("pulse", mult>1);
       const el=now()-g.qStart;
       if(!g.locked){$("gBar").style.width=Math.max(0,100-el/CARD_MS*100)+"%"; if(el>=CARD_MS) answer(null);}
+      else $("gBar").style.width="0%";
     }
   }
   if(isAdmin){
@@ -469,10 +707,10 @@ function tick(){
       const left = Math.max(1, Math.min(3, Math.ceil((startAt - now()) / 1000)));
       $("aStatus").textContent = String(left);
     }
-    if(ph === "final") $("aStatus").textContent="■ Terminó";
+    if(ph === "final") $("aStatus").textContent="Terminó";
     b.disabled = ph === "count" || ph === "game";
     b.style.opacity = b.disabled ? "0.4" : "1";
-    b.textContent = ph === "final" ? "↻ Nueva ronda" : ph === "lobby" ? "▶ Iniciar Juego para Todos" : "Juego en curso...";
+    b.textContent = ph === "final" ? "Nueva ronda" : ph === "lobby" ? "Iniciar juego para todos" : "Juego en curso...";
   }
 }
 /** Admin: iniciar (todos arrancan en startAt, hora del servidor) o preparar nueva ronda */
@@ -493,11 +731,14 @@ function adminAction(){
 
 /* Eventos */
 $("name").value=localStorage.nm||"";
+$("code").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
 $("btnJoin").onclick=()=>join(false);
 $("btnAdmin").onclick=()=>join(true);
 $("aBtn").onclick=adminAction;
 $("bOk").onclick=()=>answer(true);
 $("bBad").onclick=()=>answer(false);
+$("copyLobby").onclick=copyCode;
+$("copyAdmin").onclick=copyCode;
 addEventListener("keydown",e=>{
   if(curScr!=="game") return;
   if(e.key==="ArrowLeft"||e.key.toLowerCase()==="v") answer(true);
