@@ -172,9 +172,11 @@ async function loadRoomState(roomCode) {
 }
 
 async function saveRoomState(roomCode, nextState) {
+  const state = { ...(nextState || {}) };
+  delete state.__updated_at;
   const { error } = await supabase.from("rooms").upsert({
     code: roomCode,
-    state: nextState || {},
+    state,
     updated_at: new Date().toISOString()
   }, { onConflict: "code" });
 
@@ -193,7 +195,9 @@ function subscribeRoom(roomCode, callback) {
         filter: `code=eq.${roomCode}`
       },
       (payload) => {
-        callback(payload.new?.state ?? {});
+        const state = { ...(payload.new?.state ?? {}) };
+        if (payload.new?.updated_at) state.__updated_at = payload.new.updated_at;
+        callback(state);
       }
     )
     .subscribe();
@@ -209,6 +213,7 @@ const db = {
 
     const room = await loadRoomState(roomCode) || {};
     const next = JSON.parse(JSON.stringify(room));
+    delete next.__updated_at;
     const target = segments.slice(2);
 
     if (!target.length) {
@@ -268,9 +273,19 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const me={id:localStorage.pid||(localStorage.pid=Math.random().toString(36).slice(2,9)),name:""};
-let code="",isAdmin=false,room={},offset=0,g=null,waiting=false,curPhase="",curScr="",adminInit=false,roomTicker=null;
+let code="",isAdmin=false,room={},offset=0,lastRoomUpdatedAt=null,g=null,waiting=false,curPhase="",curScr="",adminInit=false,roomTicker=null;
 const now=()=>Date.now()+offset;
 const myPath=()=>`rooms/${code}/players/${me.id}`;
+
+/** Offset de reloj: solo cuando updated_at cambia (write fresco ≈ hora del servidor). */
+function applyRoomClock(nextRoom){
+  const ts = Date.parse(nextRoom?.__updated_at);
+  if(!Number.isFinite(ts)) return;
+  if(lastRoomUpdatedAt !== null && ts !== lastRoomUpdatedAt){
+    offset = ts - Date.now();
+  }
+  lastRoomUpdatedAt = ts;
+}
 
 function clearRoomTicker(){
   if(roomTicker){ clearInterval(roomTicker); roomTicker=null; }
@@ -297,6 +312,7 @@ async function join(admin){
 
   clearRoomTicker();
   room={}; g=null; waiting=false; curPhase=""; curScr=""; adminInit=false;
+  offset=0; lastRoomUpdatedAt=null;
   me.name=name; isAdmin=admin; localStorage.nm=name;
   code=($("code").value.trim().toUpperCase()||"SALA1");
   $("lobbyCode").textContent=$("aCode").textContent=code;
@@ -317,10 +333,8 @@ async function join(admin){
   db.onOffset(o=>offset=o);
   db.listen(`rooms/${code}`,r=>{
     room=r||{};
-    if (room.__updated_at) {
-      const ts = Date.parse(room.__updated_at);
-      if (Number.isFinite(ts)) offset = ts - Date.now();
-    }
+    applyRoomClock(room);
+    delete room.__updated_at;
     if(isAdmin && !room.status && !adminInit){
       adminInit=true;
       room.status = "lobby";
@@ -424,9 +438,7 @@ function tick(){
   if(ph !== curPhase){
     if(ph === "game" && !isAdmin && !waiting) startGame();
     if(curPhase === "game" && ph === "final" && !isAdmin) finishGame();
-    if(ph !== "game" && !isAdmin && g) {
-      g = null;
-    }
+    if(ph === "lobby" && !isAdmin) g = null;
     curPhase = ph;
     renderRoom();
   }
@@ -473,8 +485,8 @@ function adminAction(){
     renderRoom();
   } else if(ph==="final"){
     players().forEach(p=>db.update(`rooms/${code}/players/${p.id}`,{score:0,ok:0,bad:0,best:0,done:false}));
-    room = { ...room, status: "lobby" };
-    db.update(`rooms/${code}`,{status:"lobby"});
+    room = { ...room, status: "lobby", startAt: null };
+    db.update(`rooms/${code}`,{status:"lobby",startAt:null});
     renderRoom();
   }
 }
